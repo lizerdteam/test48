@@ -1,0 +1,2662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>liri</title>
+
+<meta name="theme-color" content="#E60023">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/idb-keyval@6/dist/umd.js"></script>
+<!-- ADDITIVE: Firebase compat SDK, used only for the upcoming offline-mailbox feature. Loaded via CDN like your other libraries above; nothing existing was touched. -->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+
+<style>
+:root {
+  --neu-bg: rgba(255,255,255,0.45);
+  --neu-shadow-d: rgba(230,0,35,0.18);
+  --neu-shadow-l: rgba(255,255,255,0.65);
+  --neu-out: 0 8px 32px rgba(230,0,35,0.14), inset 0 1px 0 rgba(255,255,255,0.6);
+  --neu-out-sm: 0 4px 18px rgba(230,0,35,0.12), inset 0 1px 0 rgba(255,255,255,0.55);
+  --neu-in: inset 0 2px 6px rgba(230,0,35,0.16), inset 0 -1px 3px rgba(255,255,255,0.5);
+  --glass-border: 1px solid rgba(255,255,255,0.55);
+  --brand: #E60023;
+  --brand-dim: #AD001B;
+  --amber: #FF5C77;
+  --danger: #C4001C;
+  --text: #3A0C14;
+  --text-dim: rgba(58,12,20,0.55);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; scrollbar-width: none; -ms-overflow-style: none; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+
+html, body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; background: radial-gradient(circle at 15% 10%, rgba(230,0,35,0.16), transparent 45%), radial-gradient(circle at 85% 90%, rgba(230,0,35,0.14), transparent 50%), #FFFFFF; min-height: 100vh; overflow: hidden; }
+
+/* Glassmorphism: translucent frosted panels over the red/white backdrop, replacing the old
+   neomorphic soft-shadow look. --neu-bg/--neu-out/--neu-in were redefined above to translucent
+   red-tinted values; this rule just adds the blur + hairline border every glass surface needs,
+   without touching any of the selectors/markup/logic below. */
+.auth-card, .top-header, .icon-btn, .avatar-btn, .myid-card, .search-bar, .chip-btn,
+.list-avatar, .list-row:hover, .thread-header, .thread-back, .thread-avatar, .composer,
+.composer input, .composer button.send-btn, .composer-plus-btn, .composer-plus-menu,
+.ask-online-bar, .ask-online-btn, .mic-btn, .voice-record-bar, .modal-card, .modal-field,
+.avatar-edit, .btn-primary, .storage-bar, .select-wrap, .msg-card-reaction-btn,
+.msg-card-action-btn, .toast, .call-icon-btn, .call-action-btn, .field, .auth-error,
+.msg-bubble, .msg-attachment-file, .msg-reaction-summary-chip, .attach-progress-bar,
+.onboard-avatar, .request-bar, .reply-preview-bar, .attach-preview-bar, .qr-scan-viewport,
+.incoming-call-avatar, .msg-avatar-attach {
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: var(--glass-border);
+}
+
+/* ===================== ONBOARDING ===================== */
+.auth-wrap { height: 100vh; width: 100%; display: flex; align-items: center; justify-content: center; background: var(--neu-bg); }
+.auth-card { width: 340px; padding: 40px 28px 32px; border-radius: 28px; background: var(--neu-bg); box-shadow: var(--neu-out); color: var(--text); }
+.auth-brand { font-size: 15px; font-weight: 700; letter-spacing: 0.04em; color: var(--brand); text-transform: uppercase; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+.auth-brand .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 8px var(--brand); }
+.auth-title { font-size: 24px; font-weight: 800; line-height: 1.25; margin-bottom: 8px; letter-spacing: -0.4px; }
+.auth-sub { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; margin-bottom: 26px; }
+.onboard-avatar-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.onboard-avatar { width: 58px; height: 58px; border-radius: 16px; overflow: hidden; background: var(--neu-bg); box-shadow: var(--neu-out-sm); cursor: pointer; flex-shrink: 0; }
+.onboard-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.onboard-avatar-hint { font-size: 11.5px; color: var(--text-dim); line-height: 1.5; }
+.field { border-radius: 14px; box-shadow: var(--neu-in); padding: 12px 16px; margin-bottom: 20px; }
+.field input { width: 100%; background: transparent; border: none; outline: none; color: var(--text); font-size: 15px; padding: 6px 0; }
+.field input::placeholder { color: rgba(58,12,20,0.35); }
+.hint { font-size: 11px; color: var(--text-dim); margin-top: -12px; margin-bottom: 18px; line-height: 1.5; }
+.btn-primary { width: 100%; padding: 15px; border-radius: 16px; border: none; background: var(--neu-bg); box-shadow: var(--neu-out); color: var(--brand); font-weight: 700; font-size: 15px; cursor: pointer; margin-bottom: 12px; transition: box-shadow .18s, transform .15s; }
+.btn-primary:active { box-shadow: var(--neu-in); transform: scale(0.97); }
+.btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.auth-error { background: #FBE4E4; box-shadow: var(--neu-in); color: #C0443A; font-size: 12.5px; padding: 9px 12px; border-radius: 12px; margin-bottom: 16px; display: none; }
+
+/* ===================== APP LAYOUT ===================== */
+.app-container { display: none; width: 100%; height: var(--app-vh, 100vh); flex-direction: column; background: var(--neu-bg); }
+
+.top-header {
+  background: var(--neu-bg); height: 75px; display: flex; justify-content: space-between; align-items: center;
+  padding: 0 20px 0 24px; border-bottom-left-radius: 55px 85px; box-shadow: var(--neu-out-sm);
+  position: sticky; top: 0; z-index: 50; flex-shrink: 0;
+}
+.app-title { color: var(--brand); font-size: 22px; font-weight: 900; letter-spacing: -1px; display: flex; align-items: center; gap: 8px; }
+.app-title .pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 8px var(--brand); }
+.header-actions { display: flex; align-items: center; gap: 10px; }
+.icon-btn { width: 38px; height: 38px; border-radius: 12px; background: var(--neu-bg); box-shadow: var(--neu-out-sm); border: none; cursor: pointer; font-size: 16px; color: var(--brand); display: flex; align-items: center; justify-content: center; }
+.icon-btn:active { box-shadow: var(--neu-in); }
+.avatar-btn { width: 40px; height: 40px; border-radius: 30px; overflow: hidden; background: var(--neu-bg); box-shadow: var(--neu-out-sm); border: none; cursor: pointer; position: relative; }
+.avatar-btn img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.main-content { flex: 1; display: flex; height: calc(var(--app-vh, 100vh) - 75px); overflow: hidden; }
+.viewport-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+.view-section { display: flex; flex-direction: column; height: 100%; overflow: hidden; }
+.view-header { padding: 16px 20px 10px; background: var(--neu-bg); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+.view-title { font-size: 19px; font-weight: 800; color: var(--text); letter-spacing: -0.5px; }
+
+/* Your-ID card */
+.myid-card { margin: 4px 20px 12px; padding: 12px 14px; border-radius: 16px; box-shadow: var(--neu-in); flex-shrink: 0; }
+.myid-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.myid-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 4px; }
+.myid-value { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+.myid-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.chip-btn { background: var(--neu-bg); box-shadow: var(--neu-out-sm); border: none; border-radius: 10px; padding: 7px 10px; font-size: 11px; font-weight: 700; color: var(--brand); cursor: pointer; }
+.chip-btn:active { box-shadow: var(--neu-in); }
+
+/* Connect bar */
+.search-bar-wrap { padding: 0 20px 4px; flex-shrink: 0; }
+.search-bar { width: 100%; border: none; border-radius: 20px; padding: 9px 16px; font-size: 13px; outline: none; color: var(--text); background: var(--neu-bg); box-shadow: var(--neu-in); }
+.search-bar:focus { box-shadow: inset 5px 5px 10px var(--neu-shadow-d), inset -4px -4px 8px var(--neu-shadow-l), 0 0 0 1.5px var(--brand); }
+.search-row { display: flex; gap: 8px; padding: 8px 20px 4px; flex-shrink: 0; }
+.search-row .search-bar { flex: 1; }
+.search-row .chip-btn { flex-shrink: 0; box-shadow: var(--neu-out); padding: 9px 14px; }
+
+/* Peer List */
+.list-scroll { flex: 1; overflow-y: auto; padding: 8px 12px 12px; }
+.list-row { display: flex; align-items: center; gap: 12px; padding: 11px 12px; border-radius: 16px; cursor: pointer; margin-bottom: 6px; }
+.list-row:hover { box-shadow: var(--neu-in); }
+.list-avatar { width: 42px; height: 42px; border-radius: 30px; background: var(--neu-bg); box-shadow: var(--neu-out-sm); overflow: hidden; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; }
+.list-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.list-meta { flex: 1; min-width: 0; }
+.list-name { font-weight: 700; font-size: 14px; color: var(--text); }
+.list-preview { font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.list-unread-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--brand); flex-shrink: 0; margin-left: 6px; }
+.empty-state { text-align: center; padding: 32px 16px; color: var(--text-dim); font-size: 13.5px; font-weight: 500; line-height: 1.6; }
+
+/* Chat Thread */
+.thread-wrap { display: none; flex-direction: column; height: 100%; overflow: hidden; }
+.thread-wrap.open { display: flex; }
+.thread-header { padding: 14px 20px; box-shadow: var(--neu-out-sm); display: flex; align-items: center; gap: 10px; flex-shrink: 0; background: var(--neu-bg); position: relative; z-index: 2; }
+.thread-back { background: var(--neu-bg); box-shadow: var(--neu-out-sm); border-radius: 10px; border: none; font-size: 16px; cursor: pointer; color: var(--text); padding: 4px 8px; }
+.thread-avatar { width: 32px; height: 32px; border-radius: 10px; overflow: hidden; box-shadow: var(--neu-out-sm); flex-shrink: 0; cursor: pointer; }
+.thread-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.thread-titles { flex: 1; min-width: 0; }
+.thread-title { font-weight: 800; font-size: 15px; color: var(--text); }
+.thread-title-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; margin-left: 7px; vertical-align: middle; }
+.thread-title-dot.online { background: #22c55e; }
+.thread-sub { font-size: 10.5px; color: var(--text-dim); }
+.thread-scroll { flex: 1; overflow-y: auto; padding: 14px 20px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Messages */
+.msg-outer { display: flex; flex-direction: column; align-items: flex-start; max-width: 78%; position: relative; align-self: flex-start; transition: transform .18s ease; touch-action: pan-y; user-select: none; }
+.msg-outer.me { align-self: flex-end; align-items: flex-end; }
+.msg-outer.dragging { transition: none; }
+.msg-sender-label { font-size: 10.5px; font-weight: 700; color: var(--text-dim); margin: 0 8px 3px 12px; }
+.msg-outer.me .msg-sender-label { margin: 0 12px 3px 8px; }
+.msg-swipe-hint { position: absolute; top: 50%; transform: translateY(-50%); font-size: 15px; opacity: 0; pointer-events: none; transition: opacity .12s ease; }
+.msg-swipe-hint.reply { left: -34px; color: var(--brand); }
+.msg-swipe-hint.delete { right: -34px; color: var(--danger); }
+.msg-outer.me .msg-swipe-hint.reply { left: auto; right: -34px; }
+.msg-outer.me .msg-swipe-hint.delete { right: auto; left: -34px; }
+.msg-row { display: flex; align-items: flex-end; gap: 6px; }
+.msg-outer.me .msg-row { flex-direction: row-reverse; }
+.msg-time-right { font-size: 10.5px; color: var(--text-dim); font-weight: 600; white-space: nowrap; padding-bottom: 12px; flex-shrink: 0; }
+.msg-bubble-wrap { position: relative; }
+
+.msg-avatar-attach { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; border: 2px solid var(--neu-bg); box-shadow: var(--neu-out-sm); position: absolute; left: -14px; bottom: -6px; z-index: 3; background: var(--neu-bg); }
+.msg-avatar-attach img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.msg-bubble { background: var(--neu-bg); color: var(--text); border-radius: 22px; font-size: 14px; position: relative; word-break: break-word; box-shadow: var(--neu-out-sm); cursor: pointer; transition: transform .15s ease; }
+.msg-bubble.is-them { padding: 10px 16px 10px 28px; }
+.msg-bubble.is-me { border: 1.5px solid var(--brand); padding: 9px 15px; }
+.msg-reply-quote { font-size: 11px; color: var(--text-dim); border-left: 2px solid var(--brand); padding-left: 8px; margin-bottom: 5px; opacity: 0.85; }
+.msg-attachment-img { max-width: 200px; max-height: 200px; border-radius: 12px; margin-top: 6px; display: block; object-fit: cover; box-shadow: var(--neu-out-sm); }
+.msg-attachment-file { display: flex; align-items: center; gap: 8px; background: var(--neu-bg); box-shadow: var(--neu-in); border-radius: 10px; padding: 8px 10px; margin-top: 6px; font-size: 12.5px; color: var(--text); text-decoration: none; max-width: 200px; }
+.msg-edited-tag { font-size: 10px; color: var(--text-dim); font-style: italic; }
+
+.msg-reaction-summary { position: absolute; bottom: -11px; left: 6px; display: flex; gap: 3px; z-index: 4; }
+.msg-outer.me .msg-reaction-summary { left: auto; right: 6px; }
+.msg-reaction-summary-chip { display: flex; align-items: center; gap: 2px; background: var(--neu-bg); border-radius: 10px; padding: 1px 5px; font-size: 10.5px; box-shadow: var(--neu-out-sm); }
+
+/* Composer */
+.reply-preview-bar, .attach-preview-bar { display: none; align-items: center; gap: 8px; padding: 6px 20px 0; background: var(--neu-bg); flex-shrink: 0; font-size: 12px; color: var(--text-dim); }
+.reply-preview-bar .rp-text, .attach-preview-bar span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attach-preview-thumb { width: 30px; height: 30px; border-radius: 8px; object-fit: cover; }
+.typing-indicator { font-size: 11.5px; color: var(--text-dim); padding: 0 20px 4px; font-style: italic; min-height: 16px; flex-shrink: 0; background: var(--neu-bg); }
+.date-separator { text-align: center; font-size: 11px; font-weight: 700; color: var(--text-dim); margin: 12px 0 4px; }
+
+.composer { display: flex; gap: 10px; padding: 12px 20px; box-shadow: 0 -4px 10px rgba(230,0,35,0.16); flex-shrink: 0; background: var(--neu-bg); position: relative; align-items: center; }
+.composer input { flex: 1; border: none; border-radius: 24px; padding: 10px 18px; font-size: 14px; outline: none; background: var(--neu-bg); box-shadow: var(--neu-in); color: var(--text); }
+.composer input:focus { box-shadow: inset 5px 5px 10px var(--neu-shadow-d), inset -4px -4px 8px var(--neu-shadow-l), 0 0 0 1.5px var(--brand); }
+.composer button.send-btn { background: var(--neu-bg); box-shadow: var(--neu-out-sm); color: var(--brand); border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 16px; cursor: pointer; flex-shrink: 0; }
+.composer button.send-btn:active { box-shadow: var(--neu-in); }
+
+.composer-plus-wrap { position: relative; flex-shrink: 0; }
+.composer-plus-btn { background: var(--neu-bg); color: var(--brand); border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--neu-out-sm); transition: transform .2s ease; }
+.composer-plus-btn.open { transform: rotate(45deg); box-shadow: var(--neu-in); }
+.composer-plus-menu { display: none; position: absolute; bottom: 52px; left: 0; background: var(--neu-bg); border-radius: 14px; box-shadow: var(--neu-out); padding: 6px; min-width: 190px; z-index: 70; }
+.composer-plus-menu.open { display: block; }
+.composer-plus-item { display: flex; align-items: center; gap: 8px; padding: 9px 10px; border-radius: 10px; cursor: pointer; font-size: 13px; color: var(--text); font-weight: 600; }
+.composer-plus-item:hover { box-shadow: var(--neu-in); }
+
+/* Message request bar */
+.request-bar { display: none; flex-direction: column; align-items: center; gap: 12px; padding: 22px 24px; flex-shrink: 0; background: var(--neu-bg); text-align: center; }
+.request-bar.open { display: flex; }
+.request-bar-text { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+.request-bar-actions { display: flex; gap: 10px; width: 100%; }
+.request-bar-actions .chip-btn { flex: 1; padding: 11px; box-shadow: var(--neu-out-sm); font-size: 12.5px; }
+.request-bar-actions .chip-btn.accept { color: var(--brand); }
+.request-bar-actions .chip-btn.ignore { color: var(--text-dim); }
+.request-bar-actions .chip-btn.block { color: var(--danger); }
+
+/* Ask-to-come-online bar (shown instead of the composer while the peer has no live connection) */
+.ask-online-bar { display: none; flex-direction: column; align-items: center; gap: 10px; padding: 16px 20px; flex-shrink: 0; background: var(--neu-bg); text-align: center; box-shadow: 0 -4px 10px rgba(230,0,35,0.16); }
+.ask-online-bar.open { display: flex; }
+.ask-online-text { font-size: 12.5px; color: var(--text-dim); line-height: 1.5; }
+.ask-online-btn { width: 100%; margin: 0; padding: 12px; border-radius: 16px; border: none; background: var(--neu-bg); box-shadow: var(--neu-out-sm); color: var(--brand); font-weight: 700; font-size: 13px; cursor: pointer; }
+.ask-online-btn:active { box-shadow: var(--neu-in); }
+
+/* Voice message recording bar + mic button */
+.mic-btn { background: var(--neu-bg); color: var(--brand); border: none; width: 42px; height: 42px; border-radius: 50%; font-size: 17px; cursor: pointer; flex-shrink: 0; box-shadow: var(--neu-out-sm); display: flex; align-items: center; justify-content: center; }
+.mic-btn:active { box-shadow: var(--neu-in); }
+.mic-btn.recording { color: var(--danger); box-shadow: var(--neu-in); animation: micPulse 1.1s ease-in-out infinite; }
+@keyframes micPulse { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+.voice-record-bar { display: none; align-items: center; gap: 10px; padding: 12px 20px; flex-shrink: 0; background: var(--neu-bg); box-shadow: 0 -4px 10px rgba(230,0,35,0.16); }
+.voice-record-bar.open { display: flex; }
+.voice-record-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); flex-shrink: 0; animation: micPulse 1s ease-in-out infinite; }
+.voice-record-timer { font-size: 13px; font-weight: 700; color: var(--text); flex-shrink: 0; }
+.voice-record-spacer { flex: 1; }
+.msg-attachment-audio { margin-top: 6px; max-width: 220px; width: 100%; display: block; }
+
+/* Modals */
+.modal-overlay { position: fixed; inset: 0; background: rgba(20,50,48,0.35); backdrop-filter: blur(6px); display: none; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+.modal-overlay.open { display: flex; }
+.modal-card { width: 340px; max-width: 100%; background: var(--neu-bg); border-radius: 24px; box-shadow: var(--neu-out); padding: 28px; position: relative; max-height: 90vh; overflow-y: auto; }
+.modal-title { font-size: 17px; font-weight: 800; margin-bottom: 18px; color: var(--text); }
+.modal-field { box-shadow: var(--neu-in); border-radius: 14px; padding: 10px 14px; margin-bottom: 18px; }
+.modal-field input { width: 100%; border: none; outline: none; background: transparent; color: var(--text); font-size: 14.5px; padding: 6px 0; }
+.close-x { position: absolute; top: 18px; right: 20px; background: none; border: none; font-size: 18px; cursor: pointer; color: var(--text-dim); }
+.modal-actions { display: flex; gap: 10px; margin-top: 8px; }
+.avatar-edit-wrap { display: flex; align-items: center; gap: 14px; margin-bottom: 20px; }
+.avatar-edit { width: 60px; height: 60px; border-radius: 14px; overflow: hidden; background: var(--neu-bg); box-shadow: var(--neu-out-sm); cursor: pointer; }
+.avatar-edit img { width: 100%; height: 100%; object-fit: cover; }
+.btn-ghost { background: var(--neu-bg) !important; box-shadow: var(--neu-out-sm) !important; color: var(--text) !important; }
+.modal-divider { height: 1px; background: rgba(230,0,35,0.18); margin: 20px 0; }
+.modal-section-label { font-size: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 10px; }
+#qrcode { display: flex; justify-content: center; margin: 14px 0; }
+#qrcode img, #qrcode canvas { border-radius: 8px; border: 6px solid #fff; }
+.storage-bar { height: 6px; border-radius: 3px; background: var(--neu-bg); box-shadow: var(--neu-in); overflow: hidden; margin-top: 8px; }
+.storage-fill { height: 100%; background: var(--brand); width: 0%; transition: width .3s ease; }
+.storage-text { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+.select-wrap { box-shadow: var(--neu-in); border-radius: 14px; padding: 4px; margin-bottom: 8px; }
+.select-wrap select { width: 100%; border: none; background: transparent; outline: none; color: var(--text); font-size: 13.5px; padding: 8px 10px; }
+
+/* Action Card Modal */
+.msg-card-meta { font-size: 12px; color: var(--text-dim); font-weight: 600; margin-bottom: 16px; }
+.msg-card-reaction-row { display: flex; gap: 8px; margin-bottom: 18px; }
+.msg-card-reaction-btn { display: flex; align-items: center; gap: 5px; background: var(--neu-bg); box-shadow: var(--neu-in); border-radius: 14px; padding: 7px 13px; font-size: 16px; cursor: pointer; border: none; }
+.msg-card-reaction-btn.mine { background: rgba(230,0,35,0.12); box-shadow: var(--neu-out-sm); }
+.msg-card-actions { display: flex; flex-direction: column; gap: 8px; }
+.msg-card-action-btn { display: flex; align-items: center; gap: 10px; padding: 11px 13px; border-radius: 12px; cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--text); background: var(--neu-bg); box-shadow: var(--neu-in); border: none; width: 100%; text-align: left; }
+.msg-card-action-btn.danger { color: var(--danger); }
+
+.toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--neu-bg); box-shadow: var(--neu-out); padding: 10px 18px; border-radius: 14px; font-size: 12.5px; color: var(--text); font-weight: 600; opacity: 0; pointer-events: none; transition: opacity .25s ease, bottom .25s ease; z-index: 300; }
+.toast.show { opacity: 1; bottom: 32px; }
+
+/* QR Scan modal */
+.qr-scan-viewport { position: relative; width: 100%; aspect-ratio: 1 / 1; border-radius: 18px; overflow: hidden; background: #000; box-shadow: var(--neu-in); }
+.qr-scan-viewport video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qr-scan-frame { position: absolute; inset: 14%; pointer-events: none; }
+.qsc { position: absolute; width: 26px; height: 26px; border: 3px solid var(--brand); }
+.qsc-tl { top: 0; left: 0; border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+.qsc-tr { top: 0; right: 0; border-left: none; border-bottom: none; border-radius: 0 8px 0 0; }
+.qsc-bl { bottom: 0; left: 0; border-right: none; border-top: none; border-radius: 0 0 0 8px; }
+.qsc-br { bottom: 0; right: 0; border-left: none; border-top: none; border-radius: 0 0 8px 0; }
+.qr-scan-line { position: absolute; left: 0; right: 0; height: 2px; background: var(--brand); box-shadow: 0 0 8px var(--brand); animation: qrScanMove 2s ease-in-out infinite; }
+@keyframes qrScanMove { 0% { top: 0; } 50% { top: 100%; } 100% { top: 0; } }
+.qr-scan-hint { text-align: center; margin-top: 14px; font-size: 11.5px; color: var(--text-dim); line-height: 1.5; }
+
+/* ===================== CALLS ===================== */
+.call-icon-btn { width: 38px; height: 38px; border-radius: 12px; background: var(--neu-bg); box-shadow: var(--neu-out-sm); border: none; cursor: pointer; font-size: 16px; color: var(--brand); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.call-icon-btn:active { box-shadow: var(--neu-in); }
+
+.incoming-call-avatar { width: 84px; height: 84px; border-radius: 26px; overflow: hidden; margin: 0 auto 16px; box-shadow: var(--neu-out); position: relative; }
+.incoming-call-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.incoming-call-avatar::after { content: ''; position: absolute; inset: -8px; border-radius: 32px; border: 2px solid var(--brand); opacity: .55; animation: callRing 1.4s ease-out infinite; }
+@keyframes callRing { 0% { transform: scale(0.9); opacity: .6; } 100% { transform: scale(1.25); opacity: 0; } }
+.incoming-call-name { text-align: center; font-size: 17px; font-weight: 800; color: var(--text); margin-bottom: 4px; }
+.incoming-call-sub { text-align: center; font-size: 12.5px; color: var(--text-dim); margin-bottom: 26px; }
+.incoming-call-actions { display: flex; gap: 14px; }
+.call-action-btn { flex: 1; padding: 14px; border-radius: 16px; border: none; font-weight: 700; font-size: 14px; cursor: pointer; box-shadow: var(--neu-out); background: var(--neu-bg); }
+.call-action-btn.accept { color: var(--brand); }
+.call-action-btn.decline { color: var(--danger); }
+.call-action-btn:active { box-shadow: var(--neu-in); }
+
+.call-overlay { position: fixed; inset: 0; background: #16211F; display: none; flex-direction: column; align-items: center; justify-content: space-between; z-index: 250; padding: 40px 24px 34px; color: #EAF2F1; }
+.call-overlay.open { display: flex; }
+.call-overlay-top { text-align: center; margin-top: 10px; }
+.call-overlay-name { font-size: 19px; font-weight: 800; margin-bottom: 6px; }
+.call-overlay-status { font-size: 13px; color: #9FB8B6; letter-spacing: .02em; }
+.call-audio-avatar { display: block; width: 120px; height: 120px; border-radius: 36px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,0.4); margin: 26px auto; }
+.call-audio-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.call-controls { display: flex; gap: 18px; align-items: center; justify-content: center; }
+.call-control-btn { width: 56px; height: 56px; border-radius: 50%; border: none; background: rgba(255,255,255,0.1); color: #EAF2F1; font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.call-control-btn.active-off { background: rgba(255,255,255,0.28); }
+.call-control-btn.end { background: var(--danger); color: #fff; transform: rotate(135deg); }
+.call-control-btn.small { width: 44px; height: 44px; font-size: 16px; }
+.call-status-retry { text-decoration: underline; cursor: pointer; }
+
+/* Attachment transfer progress (in-bubble) */
+.attach-progress-wrap { margin-top: 6px; min-width: 160px; }
+.attach-progress-row { display: flex; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--text-dim); margin-bottom: 4px; }
+.attach-progress-bar { height: 5px; border-radius: 3px; background: var(--neu-bg); box-shadow: var(--neu-in); overflow: hidden; }
+.attach-progress-fill { height: 100%; background: var(--brand); width: 0%; transition: width .15s ease; }
+
+@media (max-width: 768px) {
+  .auth-card { width: calc(100% - 40px); }
+  .top-header { padding: 0 14px 0 18px; height: 66px; }
+  .app-title { font-size: 19px; }
+}
+
+/* ===================== ADDITIVE: @iri AI reply styling =====================
+   Pure add-on for the '@iri <question>' feature. Reuses the existing .msg-bubble
+   / .msg-outer / .msg-avatar-attach markup and CSS as-is; this just recolors the
+   text and sender label for AI-originated messages so they stand out in red,
+   everything else (bubble shape, shadows, spacing, glass effect) stays identical. */
+.msg-bubble.iri-bubble { color: #E5122A; }
+.msg-sender-label.iri-sender-label { color: #E5122A; }
+</style>
+</head>
+<body>
+
+<!-- ONBOARDING -->
+<div class="auth-wrap" id="onboard-wrap">
+  <div class="auth-card">
+    <div class="auth-brand"><span class="dot"></span>LIRI</div>
+    <div class="auth-title">Your identity,<br>your device only</div>
+    <div class="auth-sub">No account, no server. Your peer ID and messages stay on this device — set a name so peers know who they're talking to.</div>
+    <div class="auth-error" id="onboard-error"></div>
+    <div class="onboard-avatar-wrap">
+      <div class="onboard-avatar" onclick="document.getElementById('onboard-avatar-file').click()">
+        <img id="onboard-avatar-preview" src="">
+      </div>
+      <input type="file" id="onboard-avatar-file" accept="image/*" style="display:none" onchange="handleOnboardAvatarUpload(event)">
+      <div class="onboard-avatar-hint">Tap to add a photo.<br>Optional — a default is generated for you.</div>
+    </div>
+    <div class="field"><input id="onboard-name" placeholder="Display name" autocomplete="off" maxlength="30"></div>
+    <button class="btn-primary" onclick="handleOnboard()">Enter Liri</button>
+    <input type="file" id="restore-file-input" accept="application/json" style="display:none" onchange="handleRestoreFile(event)">
+    <button class="chip-btn" style="width:100%;text-align:center;" onclick="triggerRestoreFile()">Restore from backup</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div class="app-container" id="app-container">
+  <header class="top-header">
+    <div class="app-title"><span class="pulse-dot" id="header-pulse"></span>Liri</div>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="openNewConnectionModal()" title="New connection">+</button>
+      <div class="avatar-btn" onclick="openProfileModal()"><img id="user-avatar" src="" alt="me"></div>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <section class="viewport-panel">
+      <div id="view-messages" class="view-section">
+
+        <!-- List Pane -->
+        <div id="dm-list-pane" style="display:flex; flex-direction:column; height:100%; overflow:hidden;">
+          <div class="view-header"><span class="view-title">Chats</span></div>
+          <div class="list-scroll" id="dm-list"></div>
+        </div>
+
+        <!-- Thread Pane -->
+        <div class="thread-wrap" id="dm-thread">
+          <div class="thread-header">
+            <button class="thread-back" onclick="closeDmThread()">←</button>
+            <div class="thread-avatar" onclick="openPeerSettingsModal(S.activePeerId)"><img id="dm-thread-avatar" src=""></div>
+            <div class="thread-titles">
+              <div class="thread-title" id="dm-thread-title-text"></div>
+              <div class="thread-sub mono" id="dm-thread-sub"></div>
+            </div>
+            <button class="call-icon-btn" onclick="startCall()" title="Audio call"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
+          </div>
+          <div class="thread-scroll" id="dm-thread-scroll"></div>
+          <div class="request-bar" id="dm-request-bar">
+            <div class="request-bar-text" id="dm-request-text"></div>
+            <div class="request-bar-actions">
+              <button class="chip-btn accept" onclick="acceptRequest()">✓ Accept</button>
+              <button class="chip-btn ignore" onclick="ignoreRequest()">Ignore</button>
+              <button class="chip-btn block" onclick="blockFromRequest()">⛔ Block</button>
+            </div>
+          </div>
+          <div class="reply-preview-bar" id="dm-reply-preview"></div>
+          <div class="attach-preview-bar" id="dm-attach-preview"></div>
+          <div class="typing-indicator" id="dm-typing"></div>
+          <div class="voice-record-bar" id="dm-voice-record-bar">
+            <span class="voice-record-dot"></span>
+            <span class="voice-record-timer" id="dm-voice-timer">00:00</span>
+            <span class="voice-record-spacer"></span>
+            <button class="chip-btn" onclick="cancelVoiceRecording()">✕ Cancel</button>
+            <button class="chip-btn accept" onclick="stopVoiceRecording(true)">✓ Send</button>
+          </div>
+          <div class="composer" id="dm-composer">
+            <input type="file" id="dm-attach-file" accept="image/*,.pdf,.doc,.docx,.txt,.zip" style="display:none" onchange="handleAttachUpload(event)">
+            <div class="composer-plus-wrap">
+              <button class="composer-plus-btn" id="dm-plus-btn" onclick="toggleComposerPlus()" title="More">+</button>
+              <div class="composer-plus-menu" id="dm-plus-menu">
+                <div class="composer-plus-item" onclick="document.getElementById('dm-attach-file').click();closeComposerPlus()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg> Attach a file</div>
+              </div>
+            </div>
+            <input id="dm-input" placeholder="Message..." oninput="notifyTyping()" onkeydown="if(event.key==='Enter')sendDmMessage()">
+            <button class="mic-btn" id="dm-mic-btn" onmousedown="event.preventDefault()" onclick="toggleVoiceRecording()" title="Record voice message"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
+            <button class="send-btn" onmousedown="event.preventDefault()" onclick="sendDmMessage()">➤</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- NEW CONNECTION MODAL -->
+<div class="modal-overlay" id="connect-modal">
+  <div class="modal-card">
+    <button class="close-x" onclick="closeNewConnectionModal()">✕</button>
+    <div class="modal-title">new connection</div>
+    <div class="modal-section-label">your peer ID</div>
+    <div class="modal-field"><input id="myid-display" class="mono" readonly></div>
+    <div class="modal-actions">
+      <button class="btn-primary btn-ghost" style="margin:0" onclick="copyText(S.myId, 'Peer ID copied')">copy ID</button>
+      <button class="btn-primary btn-ghost" style="margin:0" onclick="copyText(getConnectLink(), 'Connect link copied')">copy link</button>
+    </div>
+    <div id="qrcode"></div>
+    <div class="modal-divider"></div>
+    <div class="modal-section-label">connect to someone</div>
+    <div class="modal-field"><input id="peer-id-input" class="mono" placeholder="paste their peer ID…"></div>
+    <button class="btn-primary" onclick="connectFromModal()">connect</button>
+    <button class="btn-primary" onclick="openQrScanModal()"> scan</button>
+  </div>
+</div>
+
+<!-- QR SCAN MODAL -->
+<div class="modal-overlay" id="qr-scan-modal">
+  <div class="modal-card" style="width:320px;">
+    <button class="close-x" onclick="closeQrScanModal()">✕</button>
+    <div class="modal-title">scan QR code</div>
+    <div class="qr-scan-viewport">
+      <video id="qr-scan-video" playsinline autoplay muted></video>
+      <div class="qr-scan-frame">
+        <span class="qsc qsc-tl"></span>
+        <span class="qsc qsc-tr"></span>
+        <span class="qsc qsc-bl"></span>
+        <span class="qsc qsc-br"></span>
+        <div class="qr-scan-line"></div>
+      </div>
+    </div>
+    <div class="qr-scan-hint mono" id="qr-scan-status">point the camera at a liri QR code…</div>
+  </div>
+</div>
+
+<!-- PROFILE MODAL -->
+<div class="modal-overlay" id="profile-modal">
+  <div class="modal-card">
+    <button class="close-x" onclick="closeProfileModal()">✕</button>
+    <div class="modal-title">your profile</div>
+    <div class="avatar-edit-wrap">
+      <div class="avatar-edit" onclick="document.getElementById('avatar-file').click()">
+        <img id="profile-avatar-preview" src="">
+      </div>
+      <input type="file" id="avatar-file" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)">
+      <div style="font-size:12px;color:var(--text-dim);line-height:1.5;">tap photo to change.</div>
+    </div>
+    <div class="modal-field"><input id="profile-displayname" placeholder="Display name"></div>
+    <button class="btn-primary" style="margin-bottom:22px;" onclick="saveProfile()">save</button>
+
+    <div class="modal-divider"></div>
+    <div class="modal-section-label">auto-delete messages</div>
+    <div class="select-wrap">
+      <select id="autoDeleteSelect" onchange="setAutoDelete(this.value)">
+        <option value="0">Off</option>
+        <option value="60000">after 1 minute</option>
+        <option value="300000">after 5 minutes</option>
+        <option value="3600000">after 1 hour</option>
+      </select>
+    </div>
+
+    <div class="modal-divider"></div>
+    <div class="modal-section-label">local storage (this device only)</div>
+    <div class="storage-bar"><div class="storage-fill" id="storageFill"></div></div>
+    <div class="storage-text" id="storageText">0 KB</div>
+
+    <div class="modal-divider"></div>
+    <div class="modal-section-label">backup</div>
+    <div style="font-size:11.5px;color:var(--text-dim);line-height:1.5;margin-bottom:10px;">saves your ID, profile and chats to a file. Keep it somewhere safe — you'll pick it manually to restore.</div>
+    <button class="btn-primary" style="margin-bottom:0;" onclick="backupData()"> backup my data</button>
+
+    <div class="modal-divider"></div>
+    <button class="btn-primary" style="color:var(--danger);" onclick="nukeData()">⨯ wipe all local data</button>
+  </div>
+</div>
+
+<!-- PER-CHAT SETTINGS MODAL -->
+<div class="modal-overlay" id="peer-settings-modal">
+  <div class="modal-card">
+    <button class="close-x" onclick="closePeerSettingsModal()">✕</button>
+    <div class="modal-title" id="peer-settings-title">chat settings</div>
+
+    <div class="modal-section-label">auto-delete messages (this chat)</div>
+    <div class="select-wrap">
+      <select id="peerAutoDeleteSelect" onchange="setPeerAutoDelete(this.value)">
+        <option value="0">Off</option>
+        <option value="60000">after 1 minute</option>
+        <option value="300000">after 5 minutes</option>
+        <option value="3600000">after 1 hour</option>
+      </select>
+    </div>
+
+    <div class="modal-divider"></div>
+    <div class="modal-section-label">local storage (this chat)</div>
+    <div class="storage-bar"><div class="storage-fill" id="peerStorageFill"></div></div>
+    <div class="storage-text" id="peerStorageText">0 KB</div>
+
+    <div class="modal-divider"></div>
+    <button class="btn-primary" id="peerBlockBtn" style="color:var(--danger);" onclick="toggleBlockPeer()"> Block this peer</button>
+    <button class="btn-primary" style="color:var(--danger);" onclick="wipePeerData()">⨯ Wipe this chat's data</button>
+    <button class="btn-primary" style="color:var(--danger);" onclick="deletePeerAccount()">🗑 Delete</button>
+  </div>
+</div>
+
+<!-- MESSAGE ACTION CARD MODAL -->
+<div class="modal-overlay" id="msg-card-modal">
+  <div class="modal-card" style="width:300px;">
+    <button class="close-x" onclick="closeMsgActionCard()">✕</button>
+    <div class="msg-card-meta" id="msg-card-time"></div>
+    <div class="msg-card-reaction-row" id="msg-card-reactions"></div>
+    <div class="msg-card-actions" id="msg-card-actions"></div>
+  </div>
+</div>
+
+<!-- INCOMING CALL MODAL -->
+<div class="modal-overlay" id="incoming-call-modal">
+  <div class="modal-card" style="text-align:center;">
+    <div class="incoming-call-avatar"><img id="incoming-call-avatar-img" src=""></div>
+    <div class="incoming-call-name" id="incoming-call-name"></div>
+    <div class="incoming-call-sub" id="incoming-call-sub"></div>
+    <div class="incoming-call-actions">
+      <button class="call-action-btn decline" onclick="declineIncomingCall()">Decline</button>
+      <button class="call-action-btn accept" onclick="acceptIncomingCall()">Accept</button>
+    </div>
+  </div>
+</div>
+
+<!-- IN-CALL OVERLAY -->
+<div class="call-overlay" id="call-overlay">
+  <div class="call-overlay-top">
+    <div class="call-overlay-name" id="call-name"></div>
+    <div class="call-overlay-status" id="call-status">Calling…</div>
+  </div>
+  <div class="call-audio-avatar" id="call-audio-avatar"><img id="call-avatar-img" src=""></div>
+  <audio id="call-remote-audio" autoplay></audio>
+  <div class="call-controls">
+    <button class="call-control-btn" id="call-mute-btn" onclick="toggleMic()"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg></button>
+    <button class="call-control-btn end" onclick="endCall()"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></button>
+  </div>
+</div>
+
+<!-- CALL DEVICE SELECTOR MODAL -->
+<div class="modal-overlay" id="device-modal">
+  <div class="modal-card" style="width:300px;">
+    <button class="close-x" onclick="closeDeviceModal()">✕</button>
+    <div class="modal-title">Call devices</div>
+    <div class="modal-section-label">Microphone</div>
+    <div class="select-wrap"><select id="micSelect" onchange="switchMic(this.value)"></select></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================== KEYBOARD-AWARE VIEWPORT HEIGHT =====================
+   Mobile keyboards don't shrink the CSS "100vh" viewport — instead the browser
+   just scrolls the whole page up to keep the focused input visible, which is
+   what was dragging the thread header / earlier messages off-screen behind the
+   keyboard. Here we track the *real* visible height (via VisualViewport when
+   available) in a CSS var that .app-container / .main-content already use,
+   and keep the page pinned at (0,0) so it's the layout that resizes, not the
+   page that scrolls. Purely a sizing fix — no other logic/markup touched. */
+(function(){
+  function setAppVH(){
+    const vv = window.visualViewport;
+    const h = vv ? vv.height : window.innerHeight;
+    document.documentElement.style.setProperty('--app-vh', h + 'px');
+    if (vv) window.scrollTo(0, 0);
+  }
+  window.addEventListener('resize', setAppVH);
+  window.addEventListener('orientationchange', setAppVH);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', setAppVH);
+    window.visualViewport.addEventListener('scroll', setAppVH);
+  }
+  setAppVH();
+})();
+
+const ICON_MIC = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/></svg>';
+const ICON_MIC_OFF = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10a7 7 0 0 0 14 0"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="3" y1="3" x2="21" y2="21"/></svg>';
+
+/* ===================== STATE & PERSISTENCE ===================== */
+const LS_IDENTITY = 'liri_identity_v1';
+const LS_PEERID = 'liri_peer_id_v1';
+const LS_PEERS = 'liri_peers_v1';       // legacy key — migrated into IndexedDB on first boot, then cleared
+const LS_SETTINGS = 'liri_settings_v1';
+const IDB_PEERS_KEY = 'liri_peers_v1';
+
+/* STUN + TURN relay config so calls/connections still work behind cellular NAT or locked-down Wi-Fi.
+   The TURN entries below use the free openrelay.metered.ca demo relay — swap in your own
+   TURN credentials (Metered.ca, Xirsys, Twilio) for production reliability. */
+const ICE_CONFIG = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:global.stun.twilio.com:3478' },
+    { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+    { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+  ]
+};
+
+/* ===================== INDEXEDDB PERSISTENCE (via idb-keyval) =====================
+   Peers/messages/attachments moved off localStorage (5-10MB ceiling) into IndexedDB
+   (hundreds of MBs), since attachments are stored inline as data URLs. Identity and
+   small settings stay in localStorage — unchanged. */
+const idbStore = (typeof idbKeyval !== 'undefined' && idbKeyval.createStore) ? idbKeyval.createStore('liri-db', 'liri-store') : null;
+async function idbGet(key){
+  if (!idbStore) return null;
+  try { const v = await idbKeyval.get(key, idbStore); return v === undefined ? null : v; }
+  catch(e){ console.error('idb get error', e); return null; }
+}
+async function idbSet(key, val){
+  if (!idbStore) return;
+  try { await idbKeyval.set(key, val, idbStore); }
+  catch(e){ console.error('idb set error (data may be too large or storage full)', e); showToast('Storage full — this change was NOT saved', 4000); }
+}
+async function idbDel(key){
+  if (!idbStore) return;
+  try { await idbKeyval.del(key, idbStore); } catch(e){ console.error('idb del error', e); }
+}
+
+let S = {
+  peer: null, myId: '', myProfile: { name: '', avatarUrl: '' },
+  conns: {},          // peerId -> DataConnection
+  peers: {},          // peerId -> { profile:{name,avatarUrl}, messages:[...] }
+  activePeerId: null,
+  autoDeleteMs: 0,
+  replyTarget: null,
+  pendingAttachment: null,
+  typingTimeout: null,
+  selectedMsgId: null,
+  onboardAvatarUrl: '',
+  peerSettingsId: null,
+  pendingIncomingAttachments: {}   // "peerId:msgId" -> data URL, held in memory only until that peer's request is accepted
+};
+
+let RTC = {
+  call: null,          // active PeerJS MediaConnection
+  incomingCall: null,  // ringing MediaConnection not yet answered
+  localStream: null,
+  type: null,           // always 'audio'
+  peerId: null,
+  status: null,          // 'outgoing' | 'active'
+  timerInterval: null,
+  startedAt: null
+};
+
+const $ = (id) => document.getElementById(id);
+const esc = (s) => (s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* Auto-linkify message text: turns bare domains/URLs (e.g. "something.com") into clickable
+   links. Operates on ALREADY-ESCAPED text only (see esc() above) — it just wraps matched
+   substrings in <a> tags, it never introduces new unescaped/raw content, so this can't reopen
+   any XSS the esc() step already closed. */
+const LINK_TLDS = 'com|net|org|io|dev|app|co|edu|gov|info|biz|xyz|me|tv|ai|in|uk|us|ca|de|fr|jp|cn|ru|br|au|bd|nl|es|it|ly|gg|cc|pro|shop|store|tech|online|site|blog';
+const LINK_RE = new RegExp('(\\bhttps?:\\/\\/[^\\s<]+|\\bwww\\.[^\\s<]+|\\b[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9-]+)*\\.(?:' + LINK_TLDS + ')\\b(?:\\/[^\\s<]*)?)', 'gi');
+function linkify(escapedText){
+  if (!escapedText) return escapedText;
+  return escapedText.replace(LINK_RE, (match) => {
+    let trail = '';
+    while (match.length && /[.,!?;:)\]]$/.test(match)) { trail = match.slice(-1) + trail; match = match.slice(0, -1); }
+    if (!match) return trail;
+    const href = /^https?:\/\//i.test(match) ? match : 'https://' + match;
+    return `<a href="${href}" target="_blank" rel="noopener noreferrer nofollow">${match}</a>${trail}`;
+  });
+}
+const dicebear = (seed) => `https://api.dicebear.com/9.x/identicon/svg?seed=${encodeURIComponent(seed||'?')}`;
+const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'id-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+const fmtTime = (ts) => new Date(ts).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+const fmtDateLabel = (ts) => {
+  const d = new Date(ts), today = new Date(), yest = new Date();
+  yest.setDate(today.getDate() - 1);
+  if (d.toDateString() === today.toDateString()) return 'Today';
+  if (d.toDateString() === yest.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString([], {day:'numeric', month:'short'});
+};
+const dateSepHTML = (ts) => `<div class="date-separator">${esc(fmtDateLabel(ts))}</div>`;
+const showErr = (id, msg) => { const e=$(id); e.textContent=msg; e.style.display='block'; };
+const hideErr = (id) => { $(id).style.display='none'; };
+
+function loadJSON(key, fallback){ try{ const v = localStorage.getItem(key); return v ? JSON.parse(v) : fallback; }catch(e){ return fallback; } }
+function saveJSON(key, val){ try{ localStorage.setItem(key, JSON.stringify(val)); }catch(e){ console.error('storage error', e); } }
+let _savePeersChain = Promise.resolve();
+function savePeers(){
+  // Serialize writes: snapshot the data synchronously now, then chain the actual idbSet
+  // after any write already in flight finishes, so two overlapping saves can't resolve
+  // out of order and let an older snapshot overwrite a newer one. Call sites stay
+  // synchronous/unchanged — this is still fire-and-forget from their perspective.
+  const snapshot = JSON.parse(JSON.stringify(S.peers));
+  _savePeersChain = _savePeersChain.then(() => idbSet(IDB_PEERS_KEY, snapshot));
+  updateStorageTracker();
+}
+
+/* ===================== ONBOARDING ===================== */
+function handleOnboardAvatarUpload(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 400 * 1024) { showToast('Avatar must be under 400KB'); e.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => { S.onboardAvatarUrl = reader.result; $('onboard-avatar-preview').src = reader.result; };
+  reader.readAsDataURL(file);
+}
+
+function handleOnboard(){
+  hideErr('onboard-error');
+  const name = $('onboard-name').value.trim();
+  if (!name) return showErr('onboard-error', 'Enter a display name.');
+  const myPeerId = 'liri-' + uuid().replace(/-/g,'').slice(0,16);
+  const identity = { name, avatarUrl: S.onboardAvatarUrl || '' };
+  saveJSON(LS_IDENTITY, identity);
+  saveJSON(LS_PEERID, myPeerId);
+  boot();
+}
+
+/* ===================== BACKUP / RESTORE =====================
+   Local-only, matches the app's no-server model: everything needed to restore this
+   identity + its chats on another device (or after a reinstall) goes into one JSON
+   file. Nothing is uploaded by the app itself — on mobile we hand the file to the
+   OS share sheet so the user can choose to save it into Google Drive/Files/etc
+   themselves; if sharing isn't available we fall back to a plain download. */
+async function backupData(){
+  try {
+    const backup = {
+      app: 'liri', version: 1, exportedAt: Date.now(),
+      myId: S.myId, myProfile: S.myProfile, peers: S.peers,
+      settings: { autoDeleteMs: S.autoDeleteMs }
+    };
+    const json = JSON.stringify(backup, null, 2);
+    const filename = `liri-backup-${new Date().toISOString().slice(0,10)}.json`;
+    const blob = new Blob([json], { type: 'application/json' });
+
+    if (navigator.canShare && navigator.share) {
+      const file = new File([blob], filename, { type: 'application/json' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Liri backup' });
+          showToast('Backup ready — choose where to save it');
+          return;
+        } catch(e) { /* user backed out of the share sheet — fall through to a plain download */ }
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    showToast('Backup downloaded');
+  } catch(e) { console.error('backup error', e); showToast('Backup failed'); }
+}
+
+function triggerRestoreFile(){ $('restore-file-input').click(); }
+
+async function handleRestoreFile(e){
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  hideErr('onboard-error');
+  try {
+    const backup = JSON.parse(await file.text());
+    if (!backup || backup.app !== 'liri' || !backup.myId || !backup.myProfile) {
+      showErr('onboard-error', "That doesn't look like a valid Liri backup file.");
+      return;
+    }
+    saveJSON(LS_IDENTITY, backup.myProfile);
+    saveJSON(LS_PEERID, backup.myId);
+    saveJSON(LS_SETTINGS, backup.settings || { autoDeleteMs: 0 });
+    await idbSet(IDB_PEERS_KEY, backup.peers || {});
+    showToast('Backup restored');
+    boot();
+  } catch(e) { console.error('restore error', e); showErr('onboard-error', 'Could not read that file.'); }
+}
+
+/* ===================== BOOT ===================== */
+async function boot(){
+  const identity = loadJSON(LS_IDENTITY, null);
+  if (!identity) {
+    $('onboard-wrap').style.display = 'flex';
+    $('onboard-avatar-preview').src = dicebear('me');
+    return;
+  }
+  S.myProfile = identity;
+
+  // Load from IndexedDB; one-time migration from the old localStorage blob if this is an upgrade
+  let peersData = await idbGet(IDB_PEERS_KEY);
+  if (!peersData) {
+    const legacy = loadJSON(LS_PEERS, null);
+    if (legacy) { peersData = legacy; await idbSet(IDB_PEERS_KEY, legacy); localStorage.removeItem(LS_PEERS); }
+  }
+  S.peers = peersData || {};
+  const settings = loadJSON(LS_SETTINGS, { autoDeleteMs: 0 });
+  S.autoDeleteMs = settings.autoDeleteMs || 0;
+
+  let myPeerId = loadJSON(LS_PEERID, null);
+  if (!myPeerId) { myPeerId = 'liri-' + uuid().replace(/-/g,'').slice(0,16); saveJSON(LS_PEERID, myPeerId); }
+
+  $('onboard-wrap').style.display = 'none';
+  $('app-container').style.display = 'flex';
+  $('user-avatar').src = S.myProfile.avatarUrl || dicebear(myPeerId);
+  $('autoDeleteSelect').value = String(S.autoDeleteMs);
+
+  initPeer(myPeerId);
+  renderDmList();
+  updateStorageTracker();
+  requestNotificationPermission();
+  requestPersistentStorage();
+}
+
+/* Ask the browser to grant persistent storage so IndexedDB (chats/attachments) is less
+   likely to be silently evicted under storage pressure — especially relevant once this
+   runs as an installed app. Best-effort only; not all browsers grant it, and nothing in
+   the app depends on it succeeding. */
+async function requestPersistentStorage(){
+  if (navigator.storage && navigator.storage.persist) {
+    try { await navigator.storage.persist(); } catch(e) { console.error('persist request failed', e); }
+  }
+}
+
+function requestNotificationPermission(){
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission();
+  }
+}
+
+function notifyIncomingMessage(fromId, text, name){
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  if (!document.hidden && S.activePeerId === fromId) return; // already looking at this chat
+  try { new Notification(name || 'New message', { body: text || '📎 Attachment', tag: 'liri-' + fromId }); } catch(e) {}
+}
+
+/* Background reconnect polling: retries peers we have pending sends for, while this tab is alive */
+function pollPendingConnections(){
+  Object.keys(S.peers).forEach(peerId => {
+    if (S.peers[peerId].blocked) return;
+    const hasPending = S.peers[peerId].messages.some(m => m.from === 'me' && m.status === 'pending');
+    if (hasPending && (!S.conns[peerId] || !S.conns[peerId].open) && S.peer) connectToPeer(peerId);
+  });
+}
+setInterval(pollPendingConnections, 4000);
+
+// Safety net alongside the peer 'disconnected' handler: some mobile networks drop the signaling
+// socket without ever firing that event. This just checks the flag PeerJS already exposes.
+setInterval(() => {
+  if (S.peer && S.peer.disconnected && !S.peer.destroyed) {
+    try { S.peer.reconnect(); } catch(e) { console.error('reconnect failed', e); }
+  }
+}, 5000);
+
+function initPeer(id){
+  S.peer = new Peer(id, { config: ICE_CONFIG }); // public PeerJS broker for signaling only; ICE_CONFIG carries the actual media/data relay
+  S.peer.on('open', pid => {
+    S.myId = pid;
+    $('myid-display').value = pid;
+    checkUrlForAutoConnect();
+  });
+  S.peer.on('connection', c => setupConnection(c));
+  S.peer.on('call', call => {
+    const fromId = call.peer;
+    if (S.peers[fromId] && S.peers[fromId].blocked) { try { call.close(); } catch(e){} return; }
+    if (RTC.call || RTC.incomingCall) { try { call.close(); } catch(e){} return; } // already busy
+    RTC.incomingCall = call;
+    const meta = call.metadata || {};
+    RTC.type = meta.type || 'audio';
+    RTC.peerId = fromId;
+    call.on('close', () => {
+      if (RTC.incomingCall === call) { RTC.incomingCall = null; hideIncomingCallModal(); showToast('Missed call'); }
+    });
+    showIncomingCallModal(fromId, meta);
+  });
+  S.peer.on('error', err => {
+    console.error(err);
+    if (err.type === 'unavailable-id') {
+      // stale id collided (rare) — mint a fresh one and retry
+      const fresh = 'liri-' + uuid().replace(/-/g,'').slice(0,16);
+      saveJSON(LS_PEERID, fresh);
+      initPeer(fresh);
+    } else {
+      showToast('Connection error: ' + err.type);
+    }
+  });
+  // The public PeerJS broker silently drops idle signaling sockets. When that happens the peer
+  // still looks "online" in our own UI (we never got told), so anyone trying to reach us fails
+  // with peer-unavailable even though our app is open. Reconnecting here keeps our registration
+  // on the broker alive without touching any chat/data logic.
+  S.peer.on('disconnected', () => {
+    console.warn('Lost signaling connection — reconnecting…');
+    try { S.peer.reconnect(); } catch(e) { console.error('reconnect failed', e); }
+  });
+}
+
+function getConnectLink(){
+  const url = new URL(window.location.href);
+  url.searchParams.set('connect', S.myId);
+  return url.toString();
+}
+
+function checkUrlForAutoConnect(){
+  const params = new URLSearchParams(window.location.search);
+  const target = params.get('connect');
+  if (!target || target === S.myId || S.conns[target]) return;
+  // connectToPeer() treats its caller as having already consented to the chat (accepted:true),
+  // so we must not fire it automatically just because a link was opened — a link can be shared
+  // by anyone, including someone the user doesn't trust. Require an explicit confirmation click
+  // first; existing connect-by-ID / QR-scan flows are untouched since the user already took an
+  // explicit action there.
+  if (!confirm(`Connect to peer "${target}"? Only continue if you trust whoever shared this link.`)) return;
+  connectToPeer(target);
+}
+
+/* ===================== CONNECTIONS ===================== */
+function ensurePeerRecord(peerId, profile, accepted){
+  if (!S.peers[peerId]) S.peers[peerId] = { profile: profile || { name: 'New peer', avatarUrl: '' }, messages: [], accepted: accepted === true, blocked: false };
+  else if (profile) S.peers[peerId].profile = profile;
+}
+
+function connectToPeer(peerId){
+  if (!peerId || peerId === S.myId) return;
+  if (S.peers[peerId] && S.peers[peerId].blocked) { showToast('You have blocked this peer'); return; }
+  if (S.conns[peerId] && S.conns[peerId].open) return;
+  ensurePeerRecord(peerId, null, true); // I'm initiating, so I've implicitly accepted this chat
+  const c = S.peer.connect(peerId, { reliable: true });
+  setupConnection(c);
+}
+
+function connectFromModal(){
+  const id = $('peer-id-input').value.trim();
+  if (!id) { showToast('Enter a peer ID first'); return; }
+  if (id === S.myId) { showToast("That's your own ID"); return; }
+  connectToPeer(id);
+  closeNewConnectionModal();
+  openDmThread(id);
+}
+
+function setupConnection(conn){
+  const peerId = conn.peer;
+  if (S.peers[peerId] && S.peers[peerId].blocked) { try { conn.close(); } catch(e){} return; }
+  S.conns[peerId] = conn;
+  ensurePeerRecord(peerId);
+
+  conn.on('open', () => {
+    conn.send({ type: 'profile', name: S.myProfile.name, avatarUrl: S.myProfile.avatarUrl });
+    flushPending(peerId);
+    flushSeenReceipts(peerId);
+    renderDmList();
+    if (S.activePeerId === peerId) { renderThreadHeader(); updateThreadPresence(); }
+  });
+  conn.on('data', data => handleData(peerId, data));
+  conn.on('close', () => {
+    delete S.conns[peerId];
+    renderDmList();
+    if (S.activePeerId === peerId) updateThreadPresence();
+  });
+  conn.on('error', err => { console.error(err); });
+}
+
+const MAX_INCOMING_TEXT = 10000;          // generous cap for a chat message
+const MAX_INCOMING_ATTACHMENT_BYTES = 25 * 1024 * 1024; // matches the sender-side 25MB cap in handleAttachUpload
+const MAX_PENDING_UNACCEPTED_ATTACHMENT_BYTES = 75 * 1024 * 1024; // cap total attachment bytes held in memory for a peer we haven't accepted yet
+const SAFE_ID_RE = /^[A-Za-z0-9_.:-]{1,128}$/;               // expected shape of our own uuid()/peer ids — anything else from the wire is rejected outright
+const ALLOWED_REACTIONS = ['❤️','👍','🔥','🤍'];              // the only reactions the UI ever sends; also blocks emoji used as a prototype-pollution key
+
+function handleData(fromId, data){
+  if (S.peers[fromId] && S.peers[fromId].blocked) return;
+  ensurePeerRecord(fromId);
+  const p = S.peers[fromId];
+
+  // Guard against a misbehaving/malicious peer sending oversized payloads that would
+  // otherwise be accepted uncapped (the 25MB/text-length limits only applied to our own
+  // outgoing uploads before this check existed).
+  if (typeof data.text === 'string' && data.text.length > MAX_INCOMING_TEXT) {
+    data.text = data.text.slice(0, MAX_INCOMING_TEXT);
+  }
+  if (data.type === 'attachStart' && data.size > MAX_INCOMING_ATTACHMENT_BYTES) {
+    showToast('Rejected an oversized incoming attachment');
+    return;
+  }
+
+  if (data.type === 'profile') {
+    p.profile = { name: data.name, avatarUrl: data.avatarUrl };
+    savePeers(); renderDmList();
+    if (S.activePeerId === fromId) renderThreadHeader();
+
+  } else if (data.type === 'message') {
+    if (typeof data.id !== 'string' || !SAFE_ID_RE.test(data.id)) return; // reject malformed/malicious ids before they ever reach the DOM
+    p.messages.push({
+      id: data.id, from: 'them', text: data.text, ts: data.ts, status: 'delivered',
+      attachment: data.attachment || null, replyTo: data.replyTo || null, reactions: {}
+    });
+    savePeers();
+    if (S.conns[fromId] && S.conns[fromId].open) S.conns[fromId].send({ type: 'ack', id: data.id });
+    if (!p.accepted) { renderDmList(); return; } // message request — stays hidden until accepted
+    if (S.activePeerId === fromId) { renderActiveThread(); markMessagesSeen(fromId); } else renderDmList();
+    notifyIncomingMessage(fromId, data.text, p.profile.name);
+
+  } else if (data.type === 'ack') {
+    const m = p.messages.find(m => m.id === data.id && m.from === 'me');
+    if (m) { m.status = 'delivered'; savePeers(); if (S.activePeerId === fromId) renderActiveThread(); }
+
+  } else if (data.type === 'reaction') {
+    if (!ALLOWED_REACTIONS.includes(data.emoji)) return; // only ever accept the fixed set the UI itself sends
+    const m = p.messages.find(m => m.id === data.msgId);
+    if (m) {
+      m.reactions = m.reactions || {};
+      m.reactions[data.emoji] = m.reactions[data.emoji] || { mine: false, theirs: false };
+      m.reactions[data.emoji].theirs = data.active;
+      savePeers();
+      if (S.activePeerId === fromId) renderActiveThread();
+    }
+
+  } else if (data.type === 'delete') {
+    p.messages = p.messages.filter(m => m.id !== data.msgId);
+    savePeers();
+    if (S.activePeerId === fromId) renderActiveThread(); else renderDmList();
+
+  } else if (data.type === 'editMessage') {
+    const m = p.messages.find(m => m.id === data.id);
+    if (m) {
+      m.text = data.text;
+      m.edited = true;
+      savePeers();
+      if (S.activePeerId === fromId) renderActiveThread(); else renderDmList();
+    }
+
+  } else if (data.type === 'seen') {
+    (data.ids || []).forEach(id => {
+      const m = p.messages.find(m => m.id === id && m.from === 'me');
+      if (m) m.status = 'seen';
+    });
+    savePeers();
+    if (S.activePeerId === fromId) renderActiveThread();
+
+  } else if (data.type === 'typing') {
+    if (S.activePeerId === fromId) {
+      $('dm-typing').textContent = `${p.profile.name || 'Peer'} is typing…`;
+      clearTimeout(S.typingTimeout);
+      S.typingTimeout = setTimeout(() => { $('dm-typing').textContent = ''; }, 2000);
+    }
+
+  } else if (data.type === 'attachStart') {
+    if (typeof data.msgId !== 'string' || !SAFE_ID_RE.test(data.msgId)) return; // reject malformed/malicious ids before they ever reach the DOM
+    S.incomingTransfers = S.incomingTransfers || {};
+    S.incomingTransfers[fromId + ':' + data.msgId] = { chunks: [], received: 0, total: data.size || 1, mime: data.mime };
+    // A dropped-and-resumed transfer re-sends attachStart with the same msgId (see sendAttachmentChunked/
+    // flushPending). Reuse the existing message entry instead of pushing a second one, or the bubble (and
+    // its DOM id "msg-<id>") gets duplicated and progress updates only ever hit the first copy.
+    const existing = p.messages.find(m => m.id === data.msgId);
+    if (existing) {
+      existing.text = data.text; existing.ts = data.ts; existing.status = 'delivered';
+      existing.attachment = { type: data.attType, name: data.name, url: null };
+      existing.replyTo = data.replyTo || null; existing.reactions = existing.reactions || {};
+      existing.transferring = true; existing.transferProgress = 0;
+      delete existing.attachmentPendingConsent;
+    } else {
+      p.messages.push({
+        id: data.msgId, from: 'them', text: data.text, ts: data.ts, status: 'delivered',
+        attachment: { type: data.attType, name: data.name, url: null },
+        replyTo: data.replyTo || null, reactions: {}, transferring: true, transferProgress: 0
+      });
+    }
+    // NOTE: intentionally NOT calling savePeers() here when the peer isn't accepted yet — see the
+    // consent gate in the attachEnd handler below for why (we don't want partial state persisted
+    // to IndexedDB for someone we haven't agreed to talk to either, though this placeholder itself
+    // carries no attachment bytes).
+    if (p.accepted) savePeers();
+    if (!p.accepted) { renderDmList(); return; }
+    if (S.activePeerId === fromId) renderActiveThread(); else renderDmList();
+
+  } else if (data.type === 'attachChunk') {
+    const t = (S.incomingTransfers || {})[fromId + ':' + data.msgId];
+    if (!t) return;
+    if (t.received > MAX_INCOMING_ATTACHMENT_BYTES) return; // peer exceeded its declared size — drop further chunks silently
+    t.chunks[data.index] = data.data;
+    t.received += data.data.length;
+    const m = p.messages.find(m => m.id === data.msgId);
+    const pct = Math.max(0, Math.min(99, Math.round((t.received / t.total) * 100)));
+    if (m) { m.transferProgress = pct; updateAttachmentProgressUI(data.msgId, pct); }
+    // Chunks always stay in the in-memory S.incomingTransfers buffer only (never savePeers()'d here),
+    // regardless of accepted status — this was already true and is what keeps mid-transfer bytes out
+    // of IndexedDB. The consent gate below decides what happens once the transfer completes.
+
+  } else if (data.type === 'attachEnd') {
+    const key = fromId + ':' + data.msgId;
+    const t = (S.incomingTransfers || {})[key];
+    const m = p.messages.find(m => m.id === data.msgId);
+    if (t && m) {
+      const dataUrl = `data:${t.mime};base64,${t.chunks.join('')}`;
+      delete S.incomingTransfers[key];
+
+      if (p.accepted) {
+        // Existing behavior for people we've already agreed to talk to: attach + persist immediately.
+        m.attachment.url = dataUrl;
+        m.transferring = false; m.transferProgress = 100;
+        savePeers();
+        if (S.conns[fromId] && S.conns[fromId].open) S.conns[fromId].send({ type: 'ack', id: data.msgId });
+        if (S.activePeerId === fromId) { renderActiveThread(); markMessagesSeen(fromId); } else renderDmList();
+        notifyIncomingMessage(fromId, m.text, p.profile.name);
+      } else if (pendingAttachmentBytesForPeer(fromId) + dataUrl.length > MAX_PENDING_UNACCEPTED_ATTACHMENT_BYTES) {
+        // Safety cap: don't let an unaccepted peer pile unlimited attachment bytes into memory
+        // before we've ever agreed to talk to them. Drop this one and mark it discarded.
+        m.transferring = false; m.transferProgress = 100; m.attachmentPendingConsent = false; m.attachmentDiscarded = true;
+        renderDmList();
+      } else {
+        // CONSENT GATE: this peer hasn't been accepted yet. Hold the finished attachment bytes purely
+        // in memory (S.pendingIncomingAttachments) instead of writing them into IndexedDB via savePeers().
+        // An unaccepted peer can otherwise push up to 25MB per message, repeatedly, straight into local
+        // storage before the user has ever consented to the chat. No ack is sent yet either — the sender
+        // will only see delivery confirmed once/if the request is accepted and the data is actually kept.
+        S.pendingIncomingAttachments[key] = dataUrl;
+        m.transferring = false; m.transferProgress = 100; m.attachmentPendingConsent = true;
+        renderDmList();
+      }
+    }
+  }
+}
+
+/* Total attachment bytes currently held in memory (pre-consent) for a given peer */
+function pendingAttachmentBytesForPeer(peerId){
+  const prefix = peerId + ':';
+  let total = 0;
+  Object.keys(S.pendingIncomingAttachments).forEach(key => {
+    if (key.indexOf(prefix) === 0) total += (S.pendingIncomingAttachments[key] || '').length;
+  });
+  return total;
+}
+
+/* Lightweight direct DOM update so a progress bar ticking every ~16KB doesn't force a full thread re-render */
+function updateAttachmentProgressUI(msgId, pct){
+  const row = document.getElementById('msg-' + msgId);
+  if (!row) return;
+  const fill = row.querySelector('.attach-progress-fill');
+  const label = row.querySelector('.attach-progress-label');
+  if (fill) fill.style.width = pct + '%';
+  if (label) label.textContent = pct + '%';
+}
+
+/* Release any in-memory-only attachment bytes we were holding for a peer we never accepted
+   (e.g. they got blocked, or their whole chat record was wiped) so nothing lingers in RAM. */
+function clearPendingAttachmentsForPeer(peerId){
+  if (!S.pendingIncomingAttachments) return;
+  const prefix = peerId + ':';
+  Object.keys(S.pendingIncomingAttachments).forEach(key => {
+    if (key.indexOf(prefix) === 0) delete S.pendingIncomingAttachments[key];
+  });
+}
+
+function markMessagesSeen(peerId){
+  const p = S.peers[peerId];
+  if (!p) return;
+  const unseen = p.messages.filter(m => m.from === 'them' && m.status !== 'seen');
+  if (!unseen.length) return;
+  const ids = unseen.map(m => m.id);
+  unseen.forEach(m => m.status = 'seen');
+  const conn = S.conns[peerId];
+  if (conn && conn.open) {
+    conn.send({ type: 'seen', ids });
+  } else {
+    p.pendingSeenIds = (p.pendingSeenIds || []).concat(ids);
+  }
+  savePeers();
+}
+
+function flushSeenReceipts(peerId){
+  const p = S.peers[peerId];
+  if (!p || !p.pendingSeenIds || !p.pendingSeenIds.length) return;
+  const conn = S.conns[peerId];
+  if (!conn || !conn.open) return;
+  conn.send({ type: 'seen', ids: p.pendingSeenIds });
+  p.pendingSeenIds = [];
+  savePeers();
+}
+
+function flushPending(peerId){
+  const p = S.peers[peerId];
+  if (!p) return;
+  const conn = S.conns[peerId];
+  if (!conn || !conn.open) return;
+  p.messages.filter(m => m.from === 'me' && m.status === 'pending').forEach(m => {
+    if (m.attachment) {
+      sendAttachmentChunked(conn, m); // re-chunk from scratch; it will mark 'sent' itself once the transfer actually completes
+    } else {
+      conn.send({ type: 'message', id: m.id, text: m.text, ts: m.ts, attachment: null, replyTo: m.replyTo });
+      m.status = 'sent';
+    }
+  });
+  savePeers();
+}
+
+/* ===================== LIST RENDERING ===================== */
+function isOnline(peerId){ return !!(S.conns[peerId] && S.conns[peerId].open); }
+
+function renderDmList(){
+  const w = $('dm-list');
+  const ids = Object.keys(S.peers);
+  if (!ids.length) { w.innerHTML = '<div class="empty-state">No connections yet.<br>Tap + to share your ID or connect to a friend.</div>'; return; }
+  const rows = ids.map(id => {
+    const p = S.peers[id];
+    const last = p.messages[p.messages.length - 1];
+    const isRequest = !p.accepted;
+    const preview = isRequest ? '📩 Message request' : (last ? (last.from === 'me' ? 'You: ' : '') + (last.text || (last.attachment ? '📎 Attachment' : '')) : 'No messages yet');
+    const avatar = p.profile.avatarUrl || dicebear(id);
+    return { id, p, last, preview, avatar, isRequest };
+  }).sort((a,b) => {
+    if (a.isRequest !== b.isRequest) return a.isRequest ? -1 : 1; // requests float to top
+    return (b.last ? b.last.ts : 0) - (a.last ? a.last.ts : 0);
+  });
+
+  w.innerHTML = rows.map(r => `
+    <div class="list-row" onclick="openDmThread('${r.id}')">
+      <div class="list-avatar" onclick="event.stopPropagation(); openPeerSettingsModal('${r.id}')"><img src="${esc(r.avatar)}"></div>
+      <div class="list-meta">
+        <div class="list-name">${esc(r.p.profile.name || 'Unnamed peer')} ${isOnline(r.id) ? '<span style="color:#22c55e;font-size:10px;">●</span>' : ''} ${r.isRequest ? '<span style="color:var(--amber);font-size:10px;font-weight:700;">● Request</span>' : ''}</div>
+        <div class="list-preview">${esc(r.preview)}</div>
+      </div>
+    </div>`).join('');
+}
+
+/* ===================== THREAD ===================== */
+function openDmThread(peerId){
+  ensurePeerRecord(peerId);
+  S.activePeerId = peerId;
+  if (!S.conns[peerId] || !S.conns[peerId].open) connectToPeer(peerId);
+  $('dm-list-pane').style.display = 'none';
+  $('dm-thread').classList.add('open');
+  renderThreadHeader();
+  renderActiveThread();
+  if (S.peers[peerId] && S.peers[peerId].accepted) markMessagesSeen(peerId); // don't send "seen" for messages still hidden behind a pending request
+  cancelReply(); cancelAttachment();
+}
+
+function closeDmThread(){
+  $('dm-list-pane').style.display = 'flex';
+  $('dm-thread').classList.remove('open');
+  S.activePeerId = null;
+  cancelReply(); cancelAttachment();
+  renderDmList();
+}
+
+function renderThreadHeader(){
+  const p = S.peers[S.activePeerId];
+  if (!p) return;
+  $('dm-thread-avatar').src = p.profile.avatarUrl || dicebear(S.activePeerId);
+  $('dm-thread-title-text').innerHTML = esc(p.profile.name || 'Unnamed peer') + `<span class="thread-title-dot" id="dm-thread-online"></span>`;
+  $('dm-thread-sub').textContent = S.activePeerId;
+  updateThreadPresence();
+}
+
+function updateThreadPresence(){
+  const dot = $('dm-thread-online');
+  if (dot) dot.className = 'thread-title-dot ' + (isOnline(S.activePeerId) ? 'online' : '');
+  updateComposerVisibility();
+}
+
+/* Composer visibility now depends only on whether we've accepted this peer's chat / are mid
+   voice-recording — the composer stays visible regardless of live P2P connection status, since
+   the Firebase mailbox now handles delivery when the peer isn't online. */
+function updateComposerVisibility(){
+  const peerId = S.activePeerId;
+  const p = S.peers[peerId];
+  if (!p || !p.accepted) return; // the request-bar branch in renderActiveThread already owns visibility here
+  if (voiceRec.recorder && voiceRec.recorder.state === 'recording') return; // recording bar owns visibility right now
+  $('dm-composer').style.display = 'flex';
+}
+
+function renderActiveThread(){
+  const p = S.peers[S.activePeerId];
+  if (!p) return;
+
+  if (!p.accepted) {
+    $('dm-request-bar').classList.add('open');
+    $('dm-composer').style.display = 'none';
+    $('dm-request-text').textContent = `${p.profile.name || 'This peer'} wants to send you a message. Accept to view and reply.`;
+    $('dm-thread-scroll').innerHTML = '<div class="empty-state"> Message hidden until you accept this request.</div>';
+    return;
+  }
+  $('dm-request-bar').classList.remove('open');
+  updateComposerVisibility();
+
+  const el = $('dm-thread-scroll');
+  let lastDate = null, html = '';
+  p.messages.forEach(m => {
+    const d = new Date(m.ts).toDateString();
+    if (d !== lastDate) { html += dateSepHTML(m.ts); lastDate = d; }
+    html += msgHTML(m, p);
+  });
+  el.innerHTML = html || '<div class="empty-state">Say hello 👋<br>Messages are only stored on your two devices.</div>';
+  el.scrollTop = el.scrollHeight;
+  savePeers();
+}
+
+function msgHTML(m, p){
+  const isMe = m.from === 'me';
+  const avatar = p.profile.avatarUrl || dicebear(S.activePeerId);
+  const senderName = isMe ? (S.myProfile.name || 'You') : (p.profile.name || 'Unnamed peer');
+
+  let replyHtml = '';
+  if (m.replyTo) replyHtml = `<div class="msg-reply-quote">${esc(m.replyTo.text || 'Attachment')}</div>`;
+
+  let attachHtml = '';
+  if (m.attachment) {
+    if (m.transferring) {
+      attachHtml = `<div class="attach-progress-wrap">
+        <div class="attach-progress-row"><span>📎 ${esc(m.attachment.name || 'Receiving…')}</span><span class="attach-progress-label">${m.transferProgress || 0}%</span></div>
+        <div class="attach-progress-bar"><div class="attach-progress-fill" style="width:${m.transferProgress || 0}%"></div></div>
+      </div>`;
+    } else if (m.attachment.type === 'audio') {
+      attachHtml = `<audio class="msg-attachment-audio" controls src="${esc(m.attachment.url)}"></audio>`;
+    } else if (m.attachment.type === 'image') {
+      attachHtml = `<img src="${esc(m.attachment.url)}" class="msg-attachment-img">`;
+    } else {
+      attachHtml = `<a href="${esc(m.attachment.url)}" download="${esc(m.attachment.name)}" class="msg-attachment-file">📎 ${esc(m.attachment.name || 'Attachment')}</a>`;
+    }
+  }
+
+  let reactionsHtml = '';
+  const rKeys = Object.keys(m.reactions || {}).filter(k => m.reactions[k].mine || m.reactions[k].theirs);
+  if (rKeys.length) reactionsHtml = `<div class="msg-reaction-summary">` + rKeys.map(k => `<div class="msg-reaction-summary-chip"><span>${esc(k)}</span>${(m.reactions[k].mine && m.reactions[k].theirs) ? '<span>2</span>' : ''}</div>`).join('') + `</div>`;
+
+  const statusLabel = isMe ? ({pending:'pending', sent:'sent', delivered:'delivered', seen:'seen'}[m.status] || '') : '';
+  const editedTag = m.edited ? ' <span class="msg-edited-tag">(edited)</span>' : '';
+
+  return `
+    <div class="msg-outer ${isMe ? 'me' : ''}" id="msg-${esc(m.id)}">
+      <div class="msg-sender-label">${esc(senderName)}</div>
+      <span class="msg-swipe-hint reply">↩</span>
+      <span class="msg-swipe-hint delete">🗑</span>
+      <div class="msg-row">
+        ${!isMe ? `<div class="msg-bubble-wrap"><div class="msg-avatar-attach"><img src="${esc(avatar)}"></div>` : ''}
+        <div class="msg-bubble ${isMe ? 'is-me' : 'is-them'}">
+          ${replyHtml}
+          ${m.text ? linkify(esc(m.text)) : ''}${editedTag}
+          ${attachHtml}
+          ${reactionsHtml}
+        </div>
+        ${!isMe ? `</div>` : ''}
+        <div class="msg-time-right">${fmtTime(m.ts)}${statusLabel ? ' · ' + statusLabel : ''}</div>
+      </div>
+    </div>`;
+}
+
+/* ===================== MESSAGE REQUESTS ===================== */
+function acceptRequest(){
+  const p = S.peers[S.activePeerId];
+  if (!p) return;
+  p.accepted = true;
+
+  // Consent just arrived — now (and only now) fold any attachment bytes we were holding in
+  // memory for this peer into their messages and persist normally, same as any accepted chat.
+  const prefix = S.activePeerId + ':';
+  Object.keys(S.pendingIncomingAttachments).forEach(key => {
+    if (key.indexOf(prefix) !== 0) return;
+    const msgId = key.slice(prefix.length);
+    const url = S.pendingIncomingAttachments[key];
+    const m = p.messages.find(mm => mm.id === msgId);
+    if (m && m.attachment) {
+      m.attachment.url = url;
+      m.attachmentPendingConsent = false;
+      if (S.conns[S.activePeerId] && S.conns[S.activePeerId].open) S.conns[S.activePeerId].send({ type: 'ack', id: msgId });
+    }
+    delete S.pendingIncomingAttachments[key];
+  });
+
+  savePeers();
+  renderActiveThread();
+  renderDmList();
+  markMessagesSeen(S.activePeerId);
+  showToast('Request accepted');
+}
+
+function ignoreRequest(){
+  closeDmThread();
+}
+
+function blockFromRequest(){
+  if (!S.activePeerId) return;
+  const peerId = S.activePeerId;
+  if (!confirm('Block this peer? They will no longer be able to message you.')) return;
+  doBlockPeer(peerId);
+  closeDmThread();
+}
+
+/* ===================== SEND / REPLY / ATTACH ===================== */
+function sendDmMessage(){
+  const inp = $('dm-input'), text = inp.value.trim();
+  const att = S.pendingAttachment;
+  if ((!text && !att) || !S.activePeerId) return;
+  inp.value = '';
+
+  const msg = {
+    id: uuid(), from: 'me', text, ts: Date.now(),
+    // Attachments stay 'pending' until sendAttachmentChunked confirms the full transfer went out —
+    // marking them 'sent' immediately hid mid-transfer disconnects from the retry poller (see fix below).
+    status: (!att && S.conns[S.activePeerId] && S.conns[S.activePeerId].open) ? 'sent' : 'pending',
+    attachment: att || null, replyTo: S.replyTarget ? { text: S.replyTarget.text } : null, reactions: {}
+  };
+  S.peers[S.activePeerId].messages.push(msg);
+  savePeers();
+  renderActiveThread();
+  renderDmList();
+
+  const conn = S.conns[S.activePeerId];
+  if (conn && conn.open) {
+    if (msg.attachment) sendAttachmentChunked(conn, msg);
+    else conn.send({ type: 'message', id: msg.id, text: msg.text, ts: msg.ts, attachment: null, replyTo: msg.replyTo });
+  } else connectToPeer(S.activePeerId); // kick off a reconnect attempt right away; poller keeps retrying afterward
+
+  cancelReply(); cancelAttachment();
+
+  // Keep the keyboard open / focus on the composer after sending, same as WhatsApp/Messenger —
+  // tapping the send button (a separate element) would otherwise blur the input and dismiss
+  // the mobile keyboard. The onmousedown preventDefault on send-btn/mic-btn stops that blur;
+  // this refocus is a belt-and-braces fallback for platforms where that alone isn't enough.
+  if (document.activeElement !== inp) inp.focus({ preventScroll: true });
+}
+
+/* Chunked attachment transfer: sender already shows the file instantly (it has the bytes locally),
+   this just streams it to the peer in small pieces so the receiver sees a progress bar instead of
+   one giant blocking payload. msg.id doubles as the transfer id, so the existing 'ack' flow (sent
+   once the receiver has fully reassembled the file) still marks the sender's bubble as delivered. */
+function sendAttachmentChunked(conn, msg){
+  const CHUNK = 16 * 1024; // base64 chars per chunk — comfortably under WebRTC data channel message limits
+  const att = msg.attachment;
+  const commaIdx = att.url.indexOf(',');
+  const header = att.url.slice(0, commaIdx);
+  const base64 = att.url.slice(commaIdx + 1);
+  const mimeMatch = /data:(.*?);base64/.exec(header);
+  const mime = mimeMatch ? mimeMatch[1] : (att.type === 'image' ? 'image/*' : 'application/octet-stream');
+  const total = base64.length;
+
+  conn.send({ type: 'attachStart', msgId: msg.id, name: att.name, mime, attType: att.type, size: total, text: msg.text, ts: msg.ts, replyTo: msg.replyTo });
+
+  const peerId = conn.peer;
+  let offset = 0, index = 0;
+  (function sendNext(){
+    if (!conn.open) return; // dropped mid-transfer; msg.status is still 'pending', so the retry poller will re-run this whole function once reconnected
+    if (offset >= total) {
+      conn.send({ type: 'attachEnd', msgId: msg.id });
+      msg.status = 'sent'; // only now — once the full attachment has actually gone out — do we consider this "sent"
+      savePeers();
+      if (S.activePeerId === peerId) renderActiveThread();
+      return;
+    }
+    conn.send({ type: 'attachChunk', msgId: msg.id, index, data: base64.slice(offset, offset + CHUNK) });
+    offset += CHUNK; index++;
+    setTimeout(sendNext, 0); // yield between chunks so the UI thread and data channel buffer stay responsive
+  })();
+}
+
+function toggleComposerPlus(){ $('dm-plus-menu').classList.toggle('open'); $('dm-plus-btn').classList.toggle('open'); }
+function closeComposerPlus(){ $('dm-plus-menu').classList.remove('open'); $('dm-plus-btn').classList.remove('open'); }
+
+function handleAttachUpload(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 25 * 1024 * 1024) { showToast('Keep attachments under 25MB for P2P transfer'); e.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const isImg = file.type.startsWith('image/');
+    S.pendingAttachment = { url: reader.result, type: isImg ? 'image' : 'file', name: file.name };
+    $('dm-attach-preview').style.display = 'flex';
+    $('dm-attach-preview').innerHTML = `<span>📎 ${esc(file.name)}</span> <button onclick="cancelAttachment()" style="border:none;background:none;cursor:pointer;color:var(--text-dim);">✕</button>`;
+  };
+  reader.readAsDataURL(file);
+}
+function cancelAttachment(){ S.pendingAttachment = null; $('dm-attach-preview').style.display = 'none'; $('dm-attach-preview').innerHTML=''; }
+function cancelReply(){ S.replyTarget = null; $('dm-reply-preview').style.display = 'none'; $('dm-reply-preview').innerHTML=''; }
+
+function startReply(msgId){
+  const p = S.peers[S.activePeerId];
+  const m = p.messages.find(m => m.id === msgId);
+  if (!m) return;
+  S.replyTarget = { id: m.id, text: m.text || (m.attachment ? 'Attachment' : '') };
+  $('dm-reply-preview').style.display = 'flex';
+  $('dm-reply-preview').innerHTML = `<span class="rp-text">Replying to: ${esc(S.replyTarget.text)}</span><button onclick="cancelReply()" style="border:none;background:none;cursor:pointer;color:var(--text-dim);">✕</button>`;
+  closeMsgActionCard();
+  $('dm-input').focus();
+}
+
+function notifyTyping(){
+  const conn = S.conns[S.activePeerId];
+  if (conn && conn.open) conn.send({ type: 'typing' });
+}
+
+/* ===================== VOICE MESSAGES ===================== */
+const VOICE_MAX_MS = 5 * 60 * 1000; // 5 minute hard cap per voice message
+let voiceRec = { recorder: null, chunks: [], stream: null, startTs: 0, timerInt: null, maxTimeout: null, _send: false };
+
+function toggleVoiceRecording(){
+  if (voiceRec.recorder && voiceRec.recorder.state === 'recording') { stopVoiceRecording(true); return; }
+  startVoiceRecording();
+}
+
+async function startVoiceRecording(){
+  if (!S.activePeerId) return;
+  const p = S.peers[S.activePeerId];
+  if (!p || !p.accepted) { showToast('Accept the message request first'); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showToast('Voice messages not supported on this device/browser'); return;
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch(err) {
+    console.error(err);
+    showToast('Could not access microphone');
+    return;
+  }
+  try {
+    voiceRec.stream = stream;
+    voiceRec.chunks = [];
+    // Try a broader set of formats in priority order so recording actually starts across more
+    // browsers (Chrome/Firefox/Android favor webm/opus, iOS Safari only supports mp4, some older
+    // WebViews support neither explicitly — hence the final '' fallback to the browser default).
+    const preferredTypes = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/ogg;codecs=opus'];
+    const mimeType = preferredTypes.find(t => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || '';
+    voiceRec.recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+    voiceRec.recorder.ondataavailable = e => { if (e.data && e.data.size) voiceRec.chunks.push(e.data); };
+    voiceRec.recorder.onstop = finalizeVoiceRecording;
+    voiceRec.recorder.start();
+    voiceRec.startTs = Date.now();
+    voiceRec._send = false;
+
+    $('dm-mic-btn').classList.add('recording');
+    $('dm-composer').style.display = 'none';
+    $('dm-voice-record-bar').classList.add('open');
+    updateVoiceTimer();
+    voiceRec.timerInt = setInterval(updateVoiceTimer, 250);
+    voiceRec.maxTimeout = setTimeout(() => { showToast('Reached the 5:00 voice message limit'); stopVoiceRecording(true); }, VOICE_MAX_MS);
+  } catch(err) {
+    console.error(err);
+    showToast('Could not start recording');
+    // Recorder construction/start failed after the mic was already granted — release it here,
+    // otherwise the mic stays "in use" in the background and every next tap silently fails too.
+    stream.getTracks().forEach(t => t.stop());
+    voiceRec.stream = null; voiceRec.recorder = null; voiceRec.chunks = [];
+  }
+}
+
+function updateVoiceTimer(){
+  const secs = Math.floor((Date.now() - voiceRec.startTs) / 1000);
+  const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+  const ss = String(secs % 60).padStart(2, '0');
+  const el = $('dm-voice-timer');
+  if (el) el.textContent = `${mm}:${ss}`;
+}
+
+function stopVoiceRecording(shouldSend){
+  if (!voiceRec.recorder) return;
+  voiceRec._send = shouldSend;
+  if (voiceRec.recorder.state !== 'inactive') voiceRec.recorder.stop();
+}
+
+function cancelVoiceRecording(){
+  voiceRec._send = false;
+  if (voiceRec.recorder && voiceRec.recorder.state !== 'inactive') voiceRec.recorder.stop();
+  else finalizeVoiceRecording();
+}
+
+function finalizeVoiceRecording(){
+  clearInterval(voiceRec.timerInt); voiceRec.timerInt = null;
+  clearTimeout(voiceRec.maxTimeout); voiceRec.maxTimeout = null;
+  if (voiceRec.stream) voiceRec.stream.getTracks().forEach(t => t.stop());
+
+  $('dm-mic-btn').classList.remove('recording');
+  $('dm-voice-record-bar').classList.remove('open');
+  updateComposerVisibility(); // restore composer visibility
+
+  const durationSecs = Math.max(1, Math.round((Date.now() - voiceRec.startTs) / 1000));
+  const shouldSend = voiceRec._send;
+  const chunks = voiceRec.chunks;
+  const recorderMime = voiceRec.recorder && voiceRec.recorder.mimeType;
+  voiceRec.recorder = null; voiceRec.chunks = []; voiceRec.stream = null; voiceRec._send = false;
+
+  if (!shouldSend || !chunks.length || !S.activePeerId) return;
+
+  const blob = new Blob(chunks, { type: recorderMime || chunks[0].type || 'audio/webm' });
+  if (blob.size > 25 * 1024 * 1024) { showToast('Voice message too long to send'); return; }
+
+  const mm = String(Math.floor(durationSecs / 60)).padStart(2, '0');
+  const ss = String(durationSecs % 60).padStart(2, '0');
+  const reader = new FileReader();
+  reader.onload = () => {
+    S.pendingAttachment = { url: reader.result, type: 'audio', name: `Voice message (${mm}:${ss})` };
+    sendDmMessage();
+  };
+  reader.onerror = () => showToast('Could not process voice message');
+  reader.readAsDataURL(blob);
+}
+
+/* ===================== REACTIONS & MESSAGE ACTIONS ===================== */
+function openMsgActionCard(msgId){
+  S.selectedMsgId = msgId;
+  const p = S.peers[S.activePeerId];
+  const m = p.messages.find(m => m.id === msgId);
+  if (!m) return;
+  $('msg-card-time').textContent = fmtTime(m.ts) + ' · ' + fmtDateLabel(m.ts);
+  $('msg-card-reactions').innerHTML = ['🙂','😢','🫩'].map(e => {
+    const mine = m.reactions && m.reactions[e] && m.reactions[e].mine;
+    return `<button class="msg-card-reaction-btn ${mine ? 'mine' : ''}" onclick="toggleReaction('${e}')">${e}</button>`;
+  }).join('');
+  $('msg-card-actions').innerHTML = `
+    <button class="msg-card-action-btn" onclick="startReply('${msgId}')">↩ Reply</button>
+    ${m.from === 'me' ? `<button class="msg-card-action-btn" onclick="editMessage('${msgId}')">✎ Edit</button>` : ''}
+    <button class="msg-card-action-btn danger" onclick="deleteMessage()">Delete for me</button>`;
+  $('msg-card-modal').classList.add('open');
+}
+function closeMsgActionCard(){ $('msg-card-modal').classList.remove('open'); }
+
+function editMessage(msgId){
+  const p = S.peers[S.activePeerId];
+  const m = p.messages.find(m => m.id === msgId);
+  if (!m || m.from !== 'me') return;
+  const newText = prompt('Edit message', m.text || '');
+  closeMsgActionCard();
+  if (newText === null) return; // cancelled
+  const trimmed = newText.trim();
+  if (!trimmed || trimmed === m.text) return;
+  m.text = trimmed;
+  m.edited = true;
+  savePeers();
+  renderActiveThread();
+  renderDmList();
+  const conn = S.conns[S.activePeerId];
+  if (conn && conn.open) conn.send({ type: 'editMessage', id: m.id, text: trimmed });
+}
+
+function toggleReaction(emoji){
+  const p = S.peers[S.activePeerId];
+  const m = p.messages.find(m => m.id === S.selectedMsgId);
+  if (!m) return;
+  m.reactions = m.reactions || {};
+  m.reactions[emoji] = m.reactions[emoji] || { mine: false, theirs: false };
+  m.reactions[emoji].mine = !m.reactions[emoji].mine;
+  savePeers();
+  closeMsgActionCard();
+  renderActiveThread();
+  const conn = S.conns[S.activePeerId];
+  if (conn && conn.open) conn.send({ type: 'reaction', msgId: m.id, emoji, active: m.reactions[emoji].mine });
+}
+
+function deleteMessage(){
+  deleteMessageDirect(S.selectedMsgId);
+  closeMsgActionCard();
+}
+
+function deleteMessageDirect(msgId){
+  const p = S.peers[S.activePeerId];
+  if (!p) return;
+  p.messages = p.messages.filter(m => m.id !== msgId);
+  savePeers();
+  renderActiveThread();
+  renderDmList();
+}
+
+function toggleReactionDirect(msgId, emoji){
+  const p = S.peers[S.activePeerId];
+  if (!p) return;
+  const m = p.messages.find(m => m.id === msgId);
+  if (!m) return;
+  m.reactions = m.reactions || {};
+  m.reactions[emoji] = m.reactions[emoji] || { mine: false, theirs: false };
+  m.reactions[emoji].mine = !m.reactions[emoji].mine;
+  savePeers();
+  renderActiveThread();
+  const conn = S.conns[S.activePeerId];
+  if (conn && conn.open) conn.send({ type: 'reaction', msgId, emoji, active: m.reactions[emoji].mine });
+}
+
+/* ===================== SWIPE-TO-REPLY / SWIPE-TO-DELETE + MULTI-CLICK REACTIONS ===================== */
+(function setupMessageGestures(){
+  const scroll = $('dm-thread-scroll');
+  let drag = null;       // { id, startX, startY, el, longPressTimer, longPressFired }
+  const SWIPE_THRESHOLD = 60;
+
+  function reset(){
+    if (drag) {
+      clearTimeout(drag.longPressTimer);
+      drag.el.classList.remove('dragging');
+      drag.el.style.transform = '';
+      const hints = drag.el.querySelectorAll('.msg-swipe-hint');
+      hints.forEach(h => h.style.opacity = 0);
+    }
+    drag = null;
+  }
+
+  scroll.addEventListener('pointerdown', e => {
+    const outer = e.target.closest('.msg-outer');
+    if (!outer) return;
+    const id = outer.id.replace('msg-', '');
+    drag = { id, startX: e.clientX, startY: e.clientY, el: outer, longPressFired: false };
+    drag.longPressTimer = setTimeout(() => { drag.longPressFired = true; openMsgActionCard(id); }, 550);
+  });
+
+  scroll.addEventListener('pointermove', e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dx) > 10 || Math.abs(dy) > 10) clearTimeout(drag.longPressTimer);
+    if (Math.abs(dx) < Math.abs(dy) || drag.longPressFired) return;
+    drag.el.classList.add('dragging');
+    drag.el.style.transform = `translateX(${dx * 0.5}px)`;
+    const replyHint = drag.el.querySelector('.msg-swipe-hint.reply');
+    const deleteHint = drag.el.querySelector('.msg-swipe-hint.delete');
+    if (dx > 20) { replyHint.style.opacity = Math.min(1, dx / SWIPE_THRESHOLD); deleteHint.style.opacity = 0; }
+    else if (dx < -20) { deleteHint.style.opacity = Math.min(1, -dx / SWIPE_THRESHOLD); replyHint.style.opacity = 0; }
+    else { replyHint.style.opacity = 0; deleteHint.style.opacity = 0; }
+  });
+
+  function finish(e){
+    if (!drag) return;
+    clearTimeout(drag.longPressTimer);
+    if (drag.longPressFired) { reset(); return; }
+    const dx = (e.clientX || 0) - drag.startX;
+    const dy = (e.clientY || 0) - drag.startY;
+    const id = drag.id;
+    reset();
+    if (Math.abs(dx) > SWIPE_THRESHOLD && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      if (dx > 0) startReply(id); else deleteMessageDirect(id);
+    }
+  }
+  scroll.addEventListener('pointerup', finish);
+  scroll.addEventListener('pointercancel', reset);
+  scroll.addEventListener('pointerleave', e => { if (drag && !drag.longPressFired) reset(); });
+
+  scroll.addEventListener('click', e => {
+    const outer = e.target.closest('.msg-outer');
+    if (!outer) return;
+    const id = outer.id.replace('msg-', '');
+    if (e.detail === 2) toggleReactionDirect(id, '🤍');
+    else if (e.detail === 3) toggleReactionDirect(id, '❤️');
+  });
+
+  scroll.addEventListener('contextmenu', e => {
+    const outer = e.target.closest('.msg-outer');
+    if (!outer) return;
+    e.preventDefault();
+    openMsgActionCard(outer.id.replace('msg-', ''));
+  });
+})();
+
+/* ===================== MODALS ===================== */
+function openNewConnectionModal(){
+  $('myid-display').value = S.myId || 'connecting…';
+  $('qrcode').innerHTML = '';
+  try { new QRCode($('qrcode'), { text: getConnectLink(), width: 130, height: 130 }); } catch(e) {}
+  $('peer-id-input').value = '';
+  $('connect-modal').classList.add('open');
+}
+function closeNewConnectionModal(){ $('connect-modal').classList.remove('open'); }
+
+/* ===================== QR CAMERA SCAN ===================== */
+let qrScanStream = null, qrScanRAF = null;
+
+function openQrScanModal(){
+  closeNewConnectionModal();
+  $('qr-scan-status').textContent = 'Point your camera at a Liri QR code…';
+  $('qr-scan-modal').classList.add('open');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    $('qr-scan-status').textContent = 'Camera not supported on this device/browser.';
+    return;
+  }
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false })
+    .then(stream => {
+      qrScanStream = stream;
+      const video = $('qr-scan-video');
+      video.srcObject = stream;
+      video.setAttribute('playsinline', true);
+      video.play();
+      // Force continuous autofocus where supported — without this many phone cameras stay
+      // locked on their initial (often blurry) focus, which is why jsQR keeps missing frames
+      // that Google Lens (native, autofocus-aware) reads instantly.
+      try {
+        const track = stream.getVideoTracks()[0];
+        const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+        if (caps && caps.focusMode && caps.focusMode.includes('continuous')) {
+          track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {});
+        }
+        // Tap-to-focus: on devices that ignore continuous autofocus, let the user tap
+        // the video to nudge the camera to refocus on that point.
+        if (caps && caps.focusMode && caps.focusMode.includes('single-shot')) {
+          qrScanTapFocusTrack = track;
+          video.addEventListener('click', qrScanTapToFocus);
+        }
+      } catch(e) {}
+      // Prefer the browser/OS-native barcode decoder when available — it's the same class
+      // of engine Google Lens uses, and reads far faster/more reliably than jsQR on blurry frames.
+      if ('BarcodeDetector' in window) {
+        BarcodeDetector.getSupportedFormats().then(formats => {
+          if (formats.includes('qr_code')) {
+            qrScanDetector = new BarcodeDetector({ formats: ['qr_code'] });
+          }
+          qrScanRAF = requestAnimationFrame(qrScanTick);
+        }).catch(() => { qrScanRAF = requestAnimationFrame(qrScanTick); });
+      } else {
+        qrScanRAF = requestAnimationFrame(qrScanTick);
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      $('qr-scan-status').textContent = 'Camera access denied or unavailable.';
+    });
+}
+
+let qrScanDetector = null, qrScanTapFocusTrack = null, qrScanDetectBusy = false;
+function qrScanTapToFocus(e){
+  if (!qrScanTapFocusTrack) return;
+  const rect = e.target.getBoundingClientRect();
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
+  qrScanTapFocusTrack.applyConstraints({
+    advanced: [{ focusMode: 'single-shot', pointsOfInterest: [{ x, y }] }]
+  }).catch(() => {});
+}
+
+function closeQrScanModal(){
+  $('qr-scan-modal').classList.remove('open');
+  if (qrScanRAF) cancelAnimationFrame(qrScanRAF);
+  qrScanRAF = null;
+  if (qrScanStream) { qrScanStream.getTracks().forEach(t => t.stop()); qrScanStream = null; }
+  const video = $('qr-scan-video');
+  if (video) { video.srcObject = null; video.removeEventListener('click', qrScanTapToFocus); }
+  qrScanDetector = null;
+  qrScanTapFocusTrack = null;
+  qrScanDetectBusy = false;
+}
+
+function qrScanTick(){
+  const video = $('qr-scan-video');
+  if (video && video.videoWidth > 0 && video.readyState === video.HAVE_ENOUGH_DATA) {
+    if (qrScanDetector) {
+      // Native OS/browser decoder path — same class of engine Google Lens uses.
+      if (!qrScanDetectBusy) {
+        qrScanDetectBusy = true;
+        qrScanDetector.detect(video).then(codes => {
+          qrScanDetectBusy = false;
+          if (codes && codes[0] && codes[0].rawValue) { handleScannedQr(codes[0].rawValue); return; }
+          qrScanRAF = requestAnimationFrame(qrScanTick);
+        }).catch(() => {
+          qrScanDetectBusy = false;
+          qrScanRAF = requestAnimationFrame(qrScanTick);
+        });
+        return;
+      }
+      qrScanRAF = requestAnimationFrame(qrScanTick);
+      return;
+    }
+    if (window.jsQR) {
+      const canvas = qrScanTick._canvas || (qrScanTick._canvas = document.createElement('canvas'));
+      const maxDim = 800; // cap the working size so decoding stays fast even if the device ignores our ideal resolution request
+      const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+      canvas.width = Math.round(video.videoWidth * scale); canvas.height = Math.round(video.videoHeight * scale);
+      const ctx = qrScanTick._ctx || (qrScanTick._ctx = canvas.getContext('2d', { willReadFrequently: true }));
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'attemptBoth' });
+      if (code && code.data) { handleScannedQr(code.data); return; }
+    }
+  }
+  qrScanRAF = requestAnimationFrame(qrScanTick);
+}
+
+function handleScannedQr(text){
+  if (qrScanTick._locked) return; // avoid double-fire while frames are still coming in
+  qrScanTick._locked = true;
+
+  let peerId = null;
+  try {
+    const url = new URL(text);
+    peerId = url.searchParams.get('connect');
+  } catch(e) { /* not a URL, treat as raw peer id */ }
+  if (!peerId) peerId = (text || '').trim();
+
+  if (!peerId) {
+    $('qr-scan-status').textContent = "Couldn't read a peer ID — try again.";
+    qrScanTick._locked = false;
+    qrScanRAF = requestAnimationFrame(qrScanTick);
+    return;
+  }
+  if (peerId === S.myId) {
+    $('qr-scan-status').textContent = "That's your own code.";
+    qrScanTick._locked = false;
+    qrScanRAF = requestAnimationFrame(qrScanTick);
+    return;
+  }
+
+  closeQrScanModal();
+  qrScanTick._locked = false;
+  connectToPeer(peerId);   // opens the connection to that peer
+  openDmThread(peerId);    // auto-opens their chat thread right away
+  showToast('Connected via QR');
+}
+
+function openPeerSettingsModal(peerId){
+  const p = S.peers[peerId];
+  if (!p) return;
+  S.peerSettingsId = peerId;
+  $('peer-settings-title').textContent = (p.profile.name || 'Unnamed peer') + ' — chat settings';
+  $('peerAutoDeleteSelect').value = String(p.autoDeleteMs || 0);
+  updatePeerStorageTracker(peerId);
+  $('peerBlockBtn').textContent = p.blocked ? '✓ Unblock this peer' : '⛔ Block this peer';
+  $('peer-settings-modal').classList.add('open');
+}
+function closePeerSettingsModal(){ $('peer-settings-modal').classList.remove('open'); S.peerSettingsId = null; }
+
+function setPeerAutoDelete(val){
+  const p = S.peers[S.peerSettingsId];
+  if (!p) return;
+  p.autoDeleteMs = parseInt(val, 10) || 0;
+  savePeers();
+}
+
+function updatePeerStorageTracker(peerId){
+  const p = S.peers[peerId];
+  if (!p) return;
+  const bytes = new Blob([JSON.stringify(p)]).size;
+  const kb = (bytes/1024).toFixed(1);
+  const fillEl = $('peerStorageFill'), textEl = $('peerStorageText');
+  if (textEl) textEl.textContent = `${kb} KB stored for this chat`;
+  if (fillEl) fillEl.style.width = Math.min(100, (bytes/500000)*100) + '%';
+}
+
+function doBlockPeer(peerId){
+  const p = S.peers[peerId];
+  if (!p) return;
+  p.blocked = true;
+  savePeers();
+  clearPendingAttachmentsForPeer(peerId); // drop any in-memory-only attachment bytes we hadn't consented to keep
+  if (S.conns[peerId]) { try { S.conns[peerId].close(); } catch(e){} delete S.conns[peerId]; }
+  if (RTC.peerId === peerId) { if (RTC.incomingCall) declineIncomingCall(); else if (RTC.call) endCall(); }
+  renderDmList();
+}
+
+function toggleBlockPeer(){
+  const peerId = S.peerSettingsId;
+  const p = S.peers[peerId];
+  if (!p) return;
+  if (p.blocked) {
+    p.blocked = false;
+    savePeers();
+    showToast('Peer unblocked');
+  } else {
+    if (!confirm('Block this peer? They will no longer be able to message you.')) return;
+    doBlockPeer(peerId);
+    showToast('Peer blocked');
+  }
+  $('peerBlockBtn').textContent = p.blocked ? '✓ Unblock this peer' : '⛔ Block this peer';
+  if (S.activePeerId === peerId) updateThreadPresence();
+}
+
+/* Wipes only this chat's message history. The peer record itself (profile, accepted
+   state, block state, settings) is deliberately left intact and the live connection
+   is left open — clearing that record used to make a returning peer look like a brand
+   new incoming message request instead of continuing in the same thread. Full account
+   removal (which does still cause that "new request" behavior, since there's nothing
+   left to recognize them by) now lives in deletePeerAccount() below. */
+function wipePeerData(){
+  const peerId = S.peerSettingsId;
+  const p = S.peers[peerId];
+  if (!peerId || !p) return;
+  if (!confirm("This permanently wipes all messages in this chat. The peer stays connected, so future messages from them will still land in this same chat. Continue?")) return;
+  clearPendingAttachmentsForPeer(peerId); // drop any in-memory-only attachment bytes we hadn't consented to keep
+  p.messages = [];
+  savePeers();
+  updatePeerStorageTracker(peerId);
+  if (S.activePeerId === peerId) renderActiveThread();
+  renderDmList();
+  showToast('Chat wiped');
+}
+
+/* Full account removal: disconnects the peer and deletes their entire local record
+   (this is the old behavior wipePeerData() used to have). Since nothing is left to
+   recognize this peer by, if they message again later it will come in as a new
+   message request rather than continuing the old thread — that's expected here,
+   unlike wipePeerData() above. */
+function deletePeerAccount(){
+  const peerId = S.peerSettingsId;
+  if (!peerId) return;
+  if (!confirm("This permanently deletes this peer's account from your device — all messages, settings, and the connection itself. If they message you again later, it will show up as a new message request. Continue?")) return;
+  if (S.conns[peerId]) { try { S.conns[peerId].close(); } catch(e){} delete S.conns[peerId]; }
+  if (RTC.peerId === peerId) { if (RTC.incomingCall) declineIncomingCall(); else if (RTC.call) endCall(); }
+  clearPendingAttachmentsForPeer(peerId); // drop any in-memory-only attachment bytes we hadn't consented to keep
+  delete S.peers[peerId];
+  savePeers();
+  closePeerSettingsModal();
+  if (S.activePeerId === peerId) closeDmThread(); else renderDmList();
+  showToast('Account deleted');
+}
+
+function openProfileModal(){
+  $('profile-displayname').value = S.myProfile.name || '';
+  $('profile-avatar-preview').src = S.myProfile.avatarUrl || dicebear(S.myId);
+  $('autoDeleteSelect').value = String(S.autoDeleteMs);
+  updateStorageTracker();
+  $('profile-modal').classList.add('open');
+}
+function closeProfileModal(){ $('profile-modal').classList.remove('open'); }
+
+function saveProfile(){
+  const name = $('profile-displayname').value.trim();
+  if (!name) { showToast('Name cannot be empty'); return; }
+  S.myProfile.name = name;
+  saveJSON(LS_IDENTITY, S.myProfile);
+  $('user-avatar').src = S.myProfile.avatarUrl || dicebear(S.myId);
+  // broadcast updated profile to all connected peers
+  Object.values(S.conns).forEach(conn => { if (conn.open) conn.send({ type: 'profile', name: S.myProfile.name, avatarUrl: S.myProfile.avatarUrl }); });
+  closeProfileModal();
+  showToast('Profile saved');
+}
+
+function handleAvatarUpload(e){
+  const file = e.target.files[0];
+  if (!file) return;
+  if (file.size > 400 * 1024) { showToast('Avatar must be under 400KB'); e.target.value = ''; return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    S.myProfile.avatarUrl = reader.result;
+    $('profile-avatar-preview').src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function setAutoDelete(val){
+  S.autoDeleteMs = parseInt(val, 10) || 0;
+  saveJSON(LS_SETTINGS, { autoDeleteMs: S.autoDeleteMs });
+}
+
+function updateStorageTracker(){
+  let bytes = 0;
+  [LS_IDENTITY, LS_PEERID, LS_SETTINGS].forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v) bytes += new Blob([v]).size;
+  });
+  bytes += new Blob([JSON.stringify(S.peers)]).size; // chats + attachments now live in IndexedDB
+  const kb = (bytes/1024).toFixed(1);
+  const mb = (bytes/1048576).toFixed(1);
+  const fillEl = $('storageFill'), textEl = $('storageText');
+  if (textEl) textEl.textContent = bytes > 1048576 ? `${mb} MB stored on this device (IndexedDB)` : `${kb} KB stored on this device`;
+  if (fillEl) fillEl.style.width = Math.min(100, (bytes/100000000)*100) + '%'; // ~100MB soft ceiling, well beyond the old 5-10MB localStorage limit
+}
+
+async function nukeData(){
+  if (!confirm('This permanently wipes your identity, all conversations, and disconnects every peer. Continue?')) return;
+  Object.values(S.conns).forEach(c => c.close());
+  if (S.peer) S.peer.destroy();
+  localStorage.removeItem(LS_IDENTITY);
+  localStorage.removeItem(LS_PEERID);
+  localStorage.removeItem(LS_PEERS);
+  localStorage.removeItem(LS_SETTINGS);
+  await idbDel(IDB_PEERS_KEY);
+  location.reload();
+}
+
+/* ===================== CALLS (audio only) ===================== */
+function callConstraints(){
+  return { audio: true, video: false };
+}
+
+async function startCall(){
+  const peerId = S.activePeerId;
+  if (!peerId) return;
+  const p = S.peers[peerId];
+  if (!p || !p.accepted) { showToast('Accept the message request first'); return; }
+  if (p.blocked) { showToast('Unblock this peer to call them'); return; }
+  if (RTC.call || RTC.incomingCall) { showToast('Already on a call'); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Calling not supported on this device/browser'); return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(callConstraints());
+    RTC.localStream = stream;
+    RTC.type = 'audio'; RTC.peerId = peerId; RTC.status = 'outgoing';
+    showCallOverlay();
+    const call = S.peer.call(peerId, stream, { metadata: { type: 'audio', name: S.myProfile.name, avatarUrl: S.myProfile.avatarUrl } });
+    setupCall(call);
+  } catch(err) {
+    console.error(err);
+    showToast('Could not access microphone');
+  }
+}
+
+function setupCall(call){
+  RTC.call = call;
+  call.on('stream', remoteStream => {
+    RTC.status = 'active';
+    attachRemoteStream(remoteStream);
+    $('call-status').textContent = '00:00';
+    startCallTimer();
+  });
+  call.on('close', () => endCallCleanup());
+  call.on('error', err => { console.error(err); showToast('Call error'); endCallCleanup(); });
+
+  // Reconnect UI: watch the underlying RTCPeerConnection for drops (cellular handoff, flaky wifi, etc.)
+  if (call.peerConnection) {
+    call.peerConnection.addEventListener('iceconnectionstatechange', () => {
+      const state = call.peerConnection.iceConnectionState;
+      if (state === 'disconnected' || state === 'failed') handleCallConnectionTrouble();
+      else if (state === 'connected' || state === 'completed') clearCallTroubleTimer();
+    });
+  }
+}
+
+let callTroubleTimer = null;
+function handleCallConnectionTrouble(){
+  if (RTC.status !== 'active' || callTroubleTimer) return;
+  RTC._pausedElapsed = RTC.startedAt ? (Date.now() - RTC.startedAt) : 0;
+  clearInterval(RTC.timerInterval);
+  $('call-status').textContent = 'Reconnecting…';
+  callTroubleTimer = setTimeout(() => {
+    $('call-status').innerHTML = '<span class="call-status-retry" onclick="retryCall()">Connection Lost — Tap to Retry</span>';
+    callTroubleTimer = 'expired';
+  }, 12000);
+}
+function clearCallTroubleTimer(){
+  const wasTrouble = !!callTroubleTimer;
+  if (callTroubleTimer && callTroubleTimer !== 'expired') clearTimeout(callTroubleTimer);
+  callTroubleTimer = null;
+  if (wasTrouble && RTC.status === 'active') {
+    RTC.startedAt = Date.now() - (RTC._pausedElapsed || 0);
+    startCallTimer(true);
+  }
+}
+function retryCall(){
+  const peerId = RTC.peerId;
+  if (!peerId) return;
+  endCall();
+  setTimeout(() => startCall(), 300);
+}
+
+async function acceptIncomingCall(){
+  const call = RTC.incomingCall;
+  if (!call) return;
+  hideIncomingCallModal();
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showToast('Calling not supported on this device/browser'); try{call.close();}catch(e){} RTC.incomingCall = null; return; }
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia(callConstraints());
+    RTC.localStream = stream;
+    RTC.status = 'outgoing';
+    showCallOverlay();
+    call.answer(stream);
+    setupCall(call);
+    RTC.incomingCall = null;
+  } catch(err) {
+    console.error(err);
+    showToast('Could not access microphone');
+    try { call.close(); } catch(e){}
+    RTC.incomingCall = null;
+  }
+}
+
+function declineIncomingCall(){
+  if (RTC.incomingCall) { try { RTC.incomingCall.close(); } catch(e){} }
+  RTC.incomingCall = null;
+  hideIncomingCallModal();
+}
+
+function endCall(){
+  if (RTC.call) { try { RTC.call.close(); } catch(e){} }
+  endCallCleanup();
+}
+
+function endCallCleanup(){
+  if (RTC.localStream) RTC.localStream.getTracks().forEach(t => t.stop());
+  clearInterval(RTC.timerInterval);
+  if (callTroubleTimer && callTroubleTimer !== 'expired') clearTimeout(callTroubleTimer);
+  callTroubleTimer = null;
+  RTC.call = null; RTC.localStream = null; RTC.status = null; RTC.timerInterval = null; RTC.startedAt = null; RTC.peerId = null; RTC.type = null; RTC._pausedElapsed = 0;
+  closeDeviceModal();
+  hideCallOverlay();
+}
+
+function showIncomingCallModal(fromId, meta){
+  const p = S.peers[fromId];
+  const name = meta.name || (p && p.profile.name) || 'Unknown';
+  const avatar = meta.avatarUrl || (p && p.profile.avatarUrl) || dicebear(fromId);
+  $('incoming-call-avatar-img').src = avatar;
+  $('incoming-call-name').textContent = name;
+  $('incoming-call-sub').textContent = 'Incoming audio call…';
+  $('incoming-call-modal').classList.add('open');
+}
+function hideIncomingCallModal(){ $('incoming-call-modal').classList.remove('open'); }
+
+function showCallOverlay(){
+  const peerId = RTC.peerId;
+  const p = S.peers[peerId] || { profile: {} };
+  $('call-name').textContent = p.profile.name || 'Unnamed peer';
+  $('call-avatar-img').src = p.profile.avatarUrl || dicebear(peerId);
+  $('call-status').textContent = 'Calling…';
+  $('call-mute-btn').innerHTML = ICON_MIC; $('call-mute-btn').classList.remove('active-off');
+  $('call-overlay').classList.add('open');
+}
+
+function hideCallOverlay(){
+  $('call-overlay').classList.remove('open');
+  $('call-remote-audio').srcObject = null;
+}
+
+function attachRemoteStream(stream){
+  $('call-remote-audio').srcObject = stream;
+}
+
+function startCallTimer(keepStart){
+  if (!keepStart) RTC.startedAt = Date.now();
+  clearInterval(RTC.timerInterval);
+  RTC.timerInterval = setInterval(() => {
+    const secs = Math.floor((Date.now() - RTC.startedAt) / 1000);
+    const mm = String(Math.floor(secs / 60)).padStart(2, '0');
+    const ss = String(secs % 60).padStart(2, '0');
+    $('call-status').textContent = `${mm}:${ss}`;
+  }, 1000);
+}
+
+function toggleMic(){
+  if (!RTC.localStream) return;
+  const track = RTC.localStream.getAudioTracks()[0];
+  if (!track) return;
+  track.enabled = !track.enabled;
+  $('call-mute-btn').classList.toggle('active-off', !track.enabled);
+  $('call-mute-btn').innerHTML = track.enabled ? ICON_MIC : ICON_MIC_OFF;
+}
+
+/* ===================== CALL DEVICES: MICROPHONE PICKER ===================== */
+async function openDeviceModal(){
+  if (!RTC.call) { showToast('Start a call first'); return; }
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) { showToast('Device switching not supported on this device/browser'); return; }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const mics = devices.filter(d => d.kind === 'audioinput');
+    $('micSelect').innerHTML = mics.length ? mics.map(d => `<option value="${esc(d.deviceId)}">${esc(d.label || 'Microphone')}</option>`).join('') : '<option value="">No microphones found</option>';
+    $('device-modal').classList.add('open');
+  } catch(e) { console.error(e); showToast('Could not list devices'); }
+}
+function closeDeviceModal(){ $('device-modal').classList.remove('open'); }
+
+async function replaceLocalTrack(kind, newTrack){
+  if (!RTC.localStream) return;
+  const oldTracks = RTC.localStream.getAudioTracks();
+  oldTracks.forEach(t => { RTC.localStream.removeTrack(t); t.stop(); });
+  RTC.localStream.addTrack(newTrack);
+  if (RTC.call && RTC.call.peerConnection) {
+    const sender = RTC.call.peerConnection.getSenders().find(s => s.track && s.track.kind === kind);
+    if (sender) { try { await sender.replaceTrack(newTrack); } catch(e) { console.error(e); } }
+  }
+}
+
+async function switchMic(deviceId){
+  if (!deviceId) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: deviceId } } });
+    await replaceLocalTrack('audio', stream.getAudioTracks()[0]);
+    showToast('Microphone switched');
+  } catch(e) { console.error(e); showToast('Could not switch microphone'); }
+}
+
+/* ===================== MISC ===================== */
+function showToast(text, durationMs){
+  const t = $('toast');
+  t.textContent = text;
+  t.classList.add('show');
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(() => t.classList.remove('show'), durationMs || 1800);
+}
+function copyText(text, msg){
+  navigator.clipboard.writeText(text).then(() => showToast(msg)).catch(() => showToast('Copy failed — select manually'));
+}
+
+/* Auto-delete sweep across all conversations (per-chat setting overrides the global one) */
+setInterval(() => {
+  const now = Date.now();
+  let changed = false;
+  Object.values(S.peers).forEach(p => {
+    const effectiveMs = p.hasOwnProperty('autoDeleteMs') ? p.autoDeleteMs : S.autoDeleteMs;
+    if (!effectiveMs) return;
+    const before = p.messages.length;
+    p.messages = p.messages.filter(m => now - m.ts < effectiveMs);
+    if (p.messages.length !== before) changed = true;
+  });
+  if (changed) {
+    savePeers();
+    if (S.activePeerId) renderActiveThread();
+    renderDmList();
+  }
+}, 4000);
+
+/* ===================== ADDITIVE FIX: warn on peer-ID collision during multi-device restore =====================
+   Pure add-on, wraps initPeer from the outside without editing its body. If a restored identity's
+   peer ID is already live on another device, PeerJS's own error handler (unchanged, above) still
+   mints a fresh ID and retries exactly as before — this only adds a toast so the user actually
+   learns why, instead of it happening silently. */
+(function(){
+  const _originalInitPeer = initPeer;
+  initPeer = function(id){
+    _originalInitPeer(id);
+    if (S.peer) {
+      S.peer.on('error', function(err){
+        if (err.type === 'unavailable-id') {
+          showToast('This ID is already online on another device — this session got a new one.', 5000);
+        }
+      });
+    }
+  };
+})();
+
+/* ===================== ADDITIVE: Firebase init (Step 1 of the offline-mailbox feature) =====================
+   Pure add-on — just connects to your Firebase project. Doesn't touch, call, or override anything
+   in your existing code yet. Later steps will add the mailbox read/write logic on top of this,
+   the same additive way as everything above. Wrapped in try/catch so if Firebase ever fails to
+   load (e.g. offline, ad-blocker), the rest of your app keeps working exactly as it did before. */
+let FB_DB = null;
+try {
+  const firebaseConfig = {
+    apiKey: "AIzaSyB6E1ivw7TOB99Kszxw4gzX5JnhrDo_8cM",
+    authDomain: "liri-app-8ef49.firebaseapp.com",
+    databaseURL: "https://liri-app-8ef49-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "liri-app-8ef49",
+    storageBucket: "liri-app-8ef49.firebasestorage.app",
+    messagingSenderId: "644647339895",
+    appId: "1:644647339895:web:d8497343a44af3865e0372"
+  };
+  firebase.initializeApp(firebaseConfig);
+  FB_DB = firebase.database();
+  console.log('[Liri/Firebase] connected — ready for the offline-mailbox feature.');
+} catch (e) {
+  console.error('[Liri/Firebase] init failed — app continues working without it.', e);
+}
+
+/* ===================== ADDITIVE: Offline mailbox (Step 2) =====================
+   Pure add-on, text messages only for now (attachments come in a later step).
+
+   SEND SIDE: wraps sendDmMessage from the outside. Your original function runs first,
+   completely untouched, and does everything it already did (local save, render, P2P
+   attempt). Afterwards this wrapper just checks: did a brand-new message get added,
+   and did it end up 'pending' (meaning P2P wasn't open)? If so, it also writes that
+   message into the recipient's Firebase mailbox as a fallback delivery path — and
+   flips the local status to 'sent' so your existing retry-poller/flushPending logic
+   (both untouched) stops trying to redeliver the same message over P2P once the
+   mailbox has taken over responsibility for it. If the Firebase write itself fails
+   for any reason, the message is simply left 'pending' and your original P2P retry
+   behavior takes over exactly as it did before this feature existed.
+
+   RECEIVE SIDE: wraps initPeer again (stacking on top of the earlier collision-warning
+   patch) to start listening to this device's own Firebase mailbox once its peer ID is
+   known. Any waiting message is pulled in using the same validation rules your P2P
+   'message' handler already uses (safe id shape, text length cap), merged into the
+   right conversation exactly like a normal incoming message, and then deleted from
+   Firebase the moment it's safely saved locally — satisfying "stored only until
+   delivered, then auto-removed." */
+
+function pushToMailbox(peerId, msg){
+  if (!FB_DB) return; // Firebase unavailable — original pending/retry behavior just continues as before
+  try {
+    FB_DB.ref('mailbox/' + peerId + '/' + msg.id).set({
+      from: S.myId,
+      fromName: S.myProfile.name || '',
+      fromAvatar: S.myProfile.avatarUrl || '',
+      text: msg.text || '',
+      ts: msg.ts,
+      replyTo: msg.replyTo || null
+    }).then(function(){
+      msg.status = 'sent'; // handed off to the mailbox — stop P2P retrying this specific message
+      savePeers();
+      if (S.activePeerId === peerId) renderActiveThread();
+    }).catch(function(e){
+      console.error('[Liri/Firebase] mailbox write failed — message stays pending, normal P2P retry still applies', e);
+    });
+  } catch(e) { console.error('[Liri/Firebase] mailbox write threw', e); }
+}
+
+(function(){
+  const _originalSendDmMessage = sendDmMessage;
+  sendDmMessage = function(){
+    const peerId = S.activePeerId;
+    const beforeLen = (peerId && S.peers[peerId]) ? S.peers[peerId].messages.length : 0;
+    _originalSendDmMessage();
+    if (!peerId || !S.peers[peerId]) return;
+    const p = S.peers[peerId];
+    if (p.messages.length <= beforeLen) return; // original returned early (empty input) — nothing new to relay
+    const msg = p.messages[p.messages.length - 1];
+    if (!msg || msg.from !== 'me' || msg.status !== 'pending') return; // only relay text messages that didn't go out via live P2P
+    if (msg.attachment) return; // attachments handled in a later step (need Firebase Storage, not the Realtime DB mailbox)
+    pushToMailbox(peerId, msg);
+  };
+})();
+
+function handleIncomingMailboxMessage(myPeerId, msgId, data){
+  if (!data || typeof data.from !== 'string' || !SAFE_ID_RE.test(data.from)) return;
+  if (typeof msgId !== 'string' || !SAFE_ID_RE.test(msgId)) return;
+  const fromId = data.from;
+  let text = typeof data.text === 'string' ? data.text : '';
+  if (text.length > MAX_INCOMING_TEXT) text = text.slice(0, MAX_INCOMING_TEXT);
+
+  if (S.peers[fromId] && S.peers[fromId].blocked) {
+    FB_DB.ref('mailbox/' + myPeerId + '/' + msgId).remove().catch(function(){});
+    return;
+  }
+
+  ensurePeerRecord(fromId);
+  const p = S.peers[fromId];
+  if (data.fromName && p.profile && p.profile.name === 'New peer') {
+    p.profile = { name: data.fromName, avatarUrl: data.fromAvatar || '' };
+  }
+
+  if (p.messages.some(function(m){ return m.id === msgId; })) {
+    FB_DB.ref('mailbox/' + myPeerId + '/' + msgId).remove().catch(function(){});
+    return;
+  }
+
+  p.messages.push({
+    id: msgId, from: 'them', text: text, ts: (typeof data.ts === 'number' ? data.ts : Date.now()),
+    status: 'delivered', attachment: null, replyTo: data.replyTo || null, reactions: {}
+  });
+  savePeers();
+
+  if (!p.accepted) {
+    renderDmList();
+  } else {
+    if (S.activePeerId === fromId) { renderActiveThread(); markMessagesSeen(fromId); } else renderDmList();
+    notifyIncomingMessage(fromId, text, p.profile.name);
+  }
+
+  FB_DB.ref('mailbox/' + myPeerId + '/' + msgId).remove()
+    .catch(function(e){ console.error('[Liri/Firebase] mailbox cleanup failed for a delivered message', e); });
+}
+
+function startMailboxListener(myPeerId){
+  if (!FB_DB || !myPeerId || S._mailboxListenerAttached === myPeerId) return;
+  S._mailboxListenerAttached = myPeerId;
+  FB_DB.ref('mailbox/' + myPeerId).on('child_added', function(snapshot){
+    handleIncomingMailboxMessage(myPeerId, snapshot.key, snapshot.val());
+  }, function(e){ console.error('[Liri/Firebase] mailbox listener error', e); });
+}
+
+(function(){
+  const _prevInitPeer = initPeer; // stacks on top of the earlier collision-warning patch, doesn't replace it
+  initPeer = function(id){
+    _prevInitPeer(id);
+    if (S.peer) {
+      S.peer.on('open', function(pid){ startMailboxListener(pid); });
+    }
+  };
+})();
+
+/* ===================== ADDITIVE FIX: ack-confirmed delivery status (Step 3) =====================
+   Pure add-on, stacks on top of the two sendDmMessage wrappers above (offline-mailbox relay,
+   then @iri trigger below) — doesn't touch either. Root cause: the original send logic marks a
+   text message 'sent' the instant PeerJS reports conn.open === true — but that flag can stay
+   true even after the underlying data channel has actually died (locked phone, silent network
+   drop, no close/error event fired). When that happens, status becomes 'sent' immediately,
+   .send() goes into a dead channel, nothing arrives — and because status was never 'pending',
+   the offline-mailbox wrapper above skips it entirely. No fallback ever kicks in.
+
+   Fix: after a text message goes out optimistically as 'sent', start a short ack-confirmation
+   timer. The existing 'ack' handler in handleData already flips status to 'delivered' the
+   moment the peer truly receives it — untouched, unchanged. If that hasn't happened by the
+   timeout, the P2P send silently failed on a stale connection, so we fall back to the same
+   Firebase mailbox path the pending-message case already uses. */
+
+const ACK_CONFIRM_TIMEOUT_MS = 7000;
+
+(function(){
+  const _prevSendDmMessage2 = sendDmMessage;
+  sendDmMessage = function(){
+    const peerId = S.activePeerId;
+    const beforeLen = (peerId && S.peers[peerId]) ? S.peers[peerId].messages.length : 0;
+    _prevSendDmMessage2();
+    if (!peerId || !S.peers[peerId]) return;
+    const p = S.peers[peerId];
+    if (p.messages.length <= beforeLen) return; // nothing new added (e.g. empty input)
+    const msg = p.messages[p.messages.length - 1];
+    // Only watch messages the original logic optimistically marked 'sent' via a supposedly-open
+    // P2P connection — skip attachments (handled separately) and AI messages.
+    if (!msg || msg.from !== 'me' || msg.status !== 'sent' || msg.attachment || msg.isAI) return;
+    const msgId = msg.id;
+    setTimeout(function(){
+      const stillP = S.peers[peerId];
+      if (!stillP) return;
+      const m = stillP.messages.find(function(mm){ return mm.id === msgId; });
+      // Still 'sent' (never bumped to 'delivered' by a real ack) → P2P send never actually
+      // landed on a stale connection. Fall back to mailbox, same as the pending-message path.
+      if (m && m.status === 'sent') pushToMailbox(peerId, m);
+    }, ACK_CONFIRM_TIMEOUT_MS);
+  };
+})();
+
+/* ===================== ADDITIVE: '@iri' in-chat text AI =====================
+   Pure add-on, does not touch any existing function body. Two people are DMing
+   over P2P; if either of them types a message starting with "@iri <question>",
+   that message still sends normally (exactly as before), and on top of that we
+   fire a request to Groq's chat-completions API and drop the answer into the
+   thread as its own message — styled in red via the .iri-bubble/.iri-sender-label
+   CSS classes above — so both sides see it, no server of ours involved.
+
+   WHOEVER ASKED does the API call and then forwards the answer to their peer over
+   the existing WebRTC data connection (type: 'aiMessage'), the same way a normal
+   'message' is forwarded. This mirrors the send/receive pattern already used by
+   the offline-mailbox patch above, just for a different message type. */
+
+const IRI_TRIGGER_RE = /^@iri\b[\s:,-]*([\s\S]*)$/i;
+
+// TODO: put your free Groq API key here — https://console.groq.com/keys
+// (Heads up: this file runs entirely in the browser, so anything you put here is
+// visible to anyone who opens dev tools. Fine for a private/test app; for anything
+// public you'd want to proxy this call through a tiny backend instead.)
+const GROQ_API_KEY = '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';
+const GROQ_MODEL = 'openai/gpt-oss-120b';
+
+async function askIri(peerId, question){
+  if (!question) return;
+  const thinkingId = uuid();
+  // Show an immediate "Iri is thinking…" placeholder to the asker only, so it feels
+  // instant even while the network request is in flight; replaced once the real
+  // answer (or an error message) comes back.
+  deliverIriPlaceholder(peerId, thinkingId);
+
+  let answer;
+  try {
+    if (!GROQ_API_KEY) {
+      answer = "⚠️ Iri isn't configured yet.";
+    } else {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + GROQ_API_KEY },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          messages: [
+            { role: 'system', content: 'You are Iri, a concise assistant inside a chat app. Answer the question directly in a few sentences, plain text only (no markdown).' },
+            { role: 'user', content: question }
+          ],
+          max_tokens: 400,
+          temperature: 0.4
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message || `Groq HTTP ${res.status}`);
+      }
+      answer = data?.choices?.[0]?.message?.content?.trim()
+        || '⚠️ Iri got an empty response — try again.';
+    }
+  } catch (e) {
+    console.error('[Liri/Iri] request failed', e);
+    answer = "⚠️ Iri couldn't reach the AI service: " + e.message;
+  }
+
+  deliverIriAnswer(peerId, thinkingId, answer);
+}
+
+function deliverIriPlaceholder(peerId, id){
+  const p = S.peers[peerId];
+  if (!p) return;
+  p.messages.push({ id, from: 'ai', isAI: true, text: 'Iri is thinking…', pending: true, ts: Date.now(), status: 'sent', attachment: null, replyTo: null, reactions: {} });
+  if (S.activePeerId === peerId) renderActiveThread(); else renderDmList();
+  // Local-only placeholder — intentionally not sent to the peer over P2P/mailbox.
+}
+
+function deliverIriAnswer(peerId, thinkingId, answerText){
+  const p = S.peers[peerId];
+  if (!p) return;
+  const msg = p.messages.find(m => m.id === thinkingId);
+  const ts = Date.now();
+  if (msg) {
+    msg.text = answerText; msg.pending = false; msg.ts = ts;
+  } else {
+    p.messages.push({ id: thinkingId, from: 'ai', isAI: true, text: answerText, ts, status: 'sent', attachment: null, replyTo: null, reactions: {} });
+  }
+  savePeers();
+  if (S.activePeerId === peerId) renderActiveThread(); else renderDmList();
+
+  const conn = S.conns[peerId];
+  if (conn && conn.open) conn.send({ type: 'aiMessage', id: thinkingId, text: answerText, ts });
+  // If the peer isn't connected right now they simply won't get this particular
+  // answer relayed (same as any other realtime-only feature in this app); the
+  // person who asked still sees it immediately either way.
+}
+
+(function(){
+  const _prevSendDmMessage = sendDmMessage;
+  sendDmMessage = function(){
+    const peerId = S.activePeerId;
+    const inputEl = $('dm-input');
+    const rawText = inputEl ? inputEl.value.trim() : ''; // read BEFORE the original clears it
+    _prevSendDmMessage();
+    if (!peerId) return;
+    const match = IRI_TRIGGER_RE.exec(rawText);
+    if (match) {
+      const question = match[1].trim();
+      if (question) askIri(peerId, question);
+    }
+  };
+})();
+
+function handleIncomingAiMessage(fromId, data){
+  if (S.peers[fromId] && S.peers[fromId].blocked) return;
+  if (typeof data.id !== 'string' || !SAFE_ID_RE.test(data.id)) return;
+  let text = typeof data.text === 'string' ? data.text : '';
+  if (text.length > MAX_INCOMING_TEXT) text = text.slice(0, MAX_INCOMING_TEXT);
+  ensurePeerRecord(fromId);
+  const p = S.peers[fromId];
+  if (p.messages.some(m => m.id === data.id)) return; // dedupe (e.g. reconnect resend)
+  p.messages.push({
+    id: data.id, from: 'ai', isAI: true, text: text, ts: (typeof data.ts === 'number' ? data.ts : Date.now()),
+    status: 'delivered', attachment: null, replyTo: null, reactions: {}
+  });
+  savePeers();
+  if (!p.accepted) { renderDmList(); return; }
+  if (S.activePeerId === fromId) { renderActiveThread(); markMessagesSeen(fromId); } else renderDmList();
+  notifyIncomingMessage(fromId, text, 'Iri');
+}
+
+(function(){
+  const _prevHandleData = handleData;
+  handleData = function(fromId, data){
+    if (data && data.type === 'aiMessage') { handleIncomingAiMessage(fromId, data); return; }
+    _prevHandleData(fromId, data);
+  };
+})();
+
+function iriMsgHTML(m){
+  const editedTag = m.pending ? ' <span class="msg-edited-tag">…</span>' : '';
+  return `
+    <div class="msg-outer" id="msg-${esc(m.id)}">
+      <div class="msg-sender-label iri-sender-label">iri</div>
+      <div class="msg-row">
+        <div class="msg-bubble-wrap"><div class="msg-avatar-attach"><img src="${esc(dicebear('iri-ai-assistant'))}"></div></div>
+        <div class="msg-bubble is-them iri-bubble">${m.text ? linkify(esc(m.text)) : ''}${editedTag}</div>
+        <div class="msg-time-right">${fmtTime(m.ts)}</div>
+      </div>
+    </div>`;
+}
+
+(function(){
+  const _prevMsgHTML = msgHTML;
+  msgHTML = function(m, p){
+    if (m && m.isAI) return iriMsgHTML(m);
+    return _prevMsgHTML(m, p);
+  };
+})();
+
+boot();
+</script>
+</body>
+</html>
